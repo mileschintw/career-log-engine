@@ -432,7 +432,7 @@ class Upgrade(unittest.TestCase):
         rc, out = self.run_tool("engine", log, "0.3.2-dev.1")
         self.assertEqual(rc, 0, out)
         # a Dev build's guide is the next guide as it stands, under the name the guide gives its script
-        self.assertEqual(out[-1], "guide: " + os.path.join(log, ".build", "upgrade", "upgrade-next.md").replace(os.sep, "/"))
+        self.assertRegex(out[-1], r"^guide: .*/\.build/upgrade/upgrade-next\.md$")   # the Log's root may print long or short
         with open(os.path.join(log, ".build", "upgrade", "upgrade-next.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "# next, at dev.1\n")
         self.assertTrue(os.path.exists(os.path.join(log, ".build", "upgrade", "upgrade-next.py")))
@@ -516,8 +516,8 @@ class Upgrade(unittest.TestCase):
             self.assertEqual(out[:2], ["from: 0.3.0", "to: 0.3.2-dev.2"])
             self.assertEqual(self.steps(out), ["0.3.2-dev.2"])   # 0.3.1 has no guide
             self.assertEqual(fetched(), [self.url, eng_url])
-            self.assertEqual(upgrade.engine(log, "0.3.2-dev.2")[1][-1],   # the Engine repo's tag, checked out
-                             "guide: " + os.path.join(log, ".build", "upgrade", "upgrade-next.md").replace(os.sep, "/"))
+            self.assertRegex(upgrade.engine(log, "0.3.2-dev.2")[1][-1],   # the Engine repo's tag, checked out
+                             r"^guide: .*/\.build/upgrade/upgrade-next\.md$")
             self.assertEqual(upgrade.stamped(log)[0], "0.3.2-dev.2")
             git(log, "reset", "-q", "--hard")   # back to 0.3.0
             rc, out = upgrade.plan(log)   # a release plan after a Dev build's: no Dev ref stays behind
