@@ -90,9 +90,9 @@ class Upgrade(unittest.TestCase):
     def tearDown(self):
         rmtree(self.tmp)
 
-    def log(self, version="0.2.0", edits=None):
+    def log(self, version="0.2.0", edits=None, name="log"):
         """A Log made from v<version>, its first commit only, with edits committed on top."""
-        log = os.path.join(self.tmp, "log")
+        log = os.path.join(self.tmp, name)
         init(log)
         git(self.tpl, "--work-tree=" + log, "checkout", "v" + version, "--", ".")
         git(self.tpl, "reset", "-q")
@@ -388,6 +388,175 @@ class Upgrade(unittest.TestCase):
         self.assertEqual(rc, 2, out)
         self.assertEqual([l.split(":")[1] for l in out], [" clean takes no --to", " clean takes no --url"])
         self.assertEqual(upgrade.load(log)["done"], [])   # nothing ran
+
+    # Dev builds (ADR 0015): `<next version>-dev.<n>`, tagged on the Engine repo's builds branch
+
+    def dev_builds(self):
+        """Tag two Dev builds of 0.3.2 after v0.3.1, each with the next guide as it stood."""
+        for n in (1, 2):
+            version = "0.3.2-dev.%d" % n
+            write(self.tpl, {"tools/TEMPLATE_VERSION": "%s\nsource %d%d%d%d%d%d%d\n" % ((version,) + (n,) * 7),
+                             "skills/career-log/SKILL.md": "intro 0.3.0\nrule one dev%d\nrule two\nrule three\nend\n" % n,
+                             "docs/upgrades/upgrade-next.md": "# next, at dev.%d\n" % n,
+                             "docs/upgrades/upgrade-next.py": "CHECKS = []\n"})
+            git(self.tpl, "add", "-A")
+            git(self.tpl, "commit", "-q", "-m", version)
+            git(self.tpl, "tag", "v" + version)
+
+    def release_032(self):
+        """Release 0.3.2 after its Dev builds, with a guide of its own."""
+        write(self.tpl, {"tools/TEMPLATE_VERSION": "0.3.2\nsource 7777777\n",
+                         "docs/upgrades/upgrade-next.md": None, "docs/upgrades/upgrade-next.py": None,
+                         "docs/upgrades/upgrade-0.3.2.md": "# Upgrade to 0.3.2\n"})
+        git(self.tpl, "add", "-A")
+        git(self.tpl, "commit", "-q", "-m", "0.3.2")
+        git(self.tpl, "tag", "v0.3.2")
+
+    def steps(self, out):
+        return [l[len("step: "):] for l in out if l.startswith("step: ")]
+
+    def test_dev_tags_leave_the_default_target_the_newest_release(self):
+        self.dev_builds()
+        rc, out = self.plan(self.log("0.3.0"))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("to: 0.3.1", out)
+        self.assertEqual(self.steps(out), ["0.3.1"])
+
+    def test_dev_to_a_dev_build(self):
+        self.dev_builds()
+        log = self.log("0.3.1")
+        rc, out = self.plan(log, "--to", "v0.3.2-dev.1")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out[:2], ["from: 0.3.1", "to: 0.3.2-dev.1"])
+        self.assertEqual(self.steps(out), ["0.3.2-dev.1"])
+        rc, out = self.run_tool("engine", log, "0.3.2-dev.1")
+        self.assertEqual(rc, 0, out)
+        # a Dev build's guide is the next guide as it stands, under the name the guide gives its script
+        self.assertRegex(out[-1], r"^guide: .*/\.build/upgrade/upgrade-next\.md$")   # the Log's root may print long or short
+        with open(os.path.join(log, ".build", "upgrade", "upgrade-next.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# next, at dev.1\n")
+        self.assertTrue(os.path.exists(os.path.join(log, ".build", "upgrade", "upgrade-next.py")))
+        self.assertEqual(upgrade.stamped(log)[0], "0.3.2-dev.1")
+
+    def test_dev_to_a_later_dev_build(self):
+        self.dev_builds()
+        log = self.log("0.3.2-dev.1")
+        rc, out = self.plan(log, "--to", "0.3.2-dev.2")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out[:2], ["from: 0.3.2-dev.1", "to: 0.3.2-dev.2"])
+        self.assertEqual(self.steps(out), ["0.3.2-dev.2"])
+        self.assertFalse([l for l in out if l.startswith("edited:")], out)   # dev.2's changes are no edit
+        rc, out = self.run_tool("engine", log, "0.3.2-dev.2")
+        self.assertEqual(rc, 0, out)
+        with open(os.path.join(log, ".build", "upgrade", "upgrade-next.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# next, at dev.2\n")
+
+    def test_dev_to_its_release(self):
+        self.dev_builds()
+        self.release_032()
+        log = self.log("0.3.2-dev.2")
+        rc, out = self.plan(log)   # the default target: the release after it
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out[:2], ["from: 0.3.2-dev.2", "to: 0.3.2"])
+        self.assertEqual(self.steps(out), ["0.3.2"])
+        rc, out = self.run_tool("engine", log, "0.3.2")
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(out[-1].endswith("/upgrade-0.3.2.md"), out)   # the release's guide, run again
+        self.assertIn("done: deleted docs/upgrades/upgrade-next.md (not in 0.3.2)", out)
+        self.assertEqual(upgrade.stamped(log)[0], "0.3.2")
+
+    def test_dev_merge_base_is_the_dev_builds_tag(self):
+        # the Log on dev.1 changed rule three; dev.1 and dev.2 each changed rule one. Merged from
+        # v0.3.1 instead, rule one would conflict
+        self.dev_builds()
+        log = self.log("0.3.2-dev.1", edits={
+            "skills/career-log/SKILL.md": "intro 0.3.0\nrule one dev1\nrule two\nrule three, mine\nend\n"})
+        rc, out = self.plan(log, "--to", "0.3.2-dev.2")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual([l for l in out if l.startswith("edited:")], ["edited: skills/career-log/SKILL.md"])
+        self.assertEqual(self.run_tool("engine", log, "0.3.2-dev.2")[0], 0)
+        git(log, "add", "-A")
+        git(log, "commit", "-q", "-m", "upgrade: Template 0.3.2-dev.2")
+        rc, out = self.run_tool("reapply", log, "--all")
+        self.assertEqual((rc, out), (0, ["merged: skills/career-log/SKILL.md"]))
+        with open(os.path.join(log, "skills/career-log/SKILL.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "intro 0.3.0\nrule one dev2\nrule two\nrule three, mine\nend\n")
+
+    def test_dev_tags_come_from_the_engine_repo_only_for_a_dev_build(self):
+        # Two scratch addresses, as the real ones: the Template's (releases only) and the Engine repo's
+        # (Dev builds only). Each plan runs in this process with every git call recorded
+        self.dev_builds()
+        log, dev_log = self.log("0.3.0"), self.log("0.3.2-dev.1", name="dev-log")
+        eng = os.path.join(self.tmp, "eng")
+        git(self.tmp, "clone", "-q", self.tpl, eng)
+        for t in git(self.tpl, "tag", "-l").split():
+            git(self.tpl if "-dev." in t else eng, "tag", "-d", t)
+        eng_url = "file://" + eng.replace("\\", "/")
+        calls = []
+        real_git = upgrade.git
+
+        def recording(root, *args, **kw):
+            calls.append(args)
+            return real_git(root, *args, **kw)
+
+        def fetched():
+            return [a[a.index("--quiet") + 1] for a in calls if a[0] == "fetch"]
+
+        saved = upgrade.URL, upgrade.DEV_URL, upgrade.git
+        upgrade.URL, upgrade.DEV_URL, upgrade.git = self.url, eng_url, recording
+        try:
+            rc, out = upgrade.plan(log)   # a release to a release
+            self.assertEqual(rc, 0, out)
+            self.assertIn("to: 0.3.1", out)
+            self.assertEqual(fetched(), [self.url])
+            self.assertNotIn("-dev.", git(log, "for-each-ref", upgrade.REFS))
+            calls.clear()
+            rc, out = upgrade.plan(log, "0.3.2-dev.2")   # a release to a Dev build
+            self.assertEqual(rc, 0, out)
+            self.assertEqual(out[:2], ["from: 0.3.0", "to: 0.3.2-dev.2"])
+            self.assertEqual(self.steps(out), ["0.3.2-dev.2"])   # 0.3.1 has no guide
+            self.assertEqual(fetched(), [self.url, eng_url])
+            self.assertRegex(upgrade.engine(log, "0.3.2-dev.2")[1][-1],   # the Engine repo's tag, checked out
+                             r"^guide: .*/\.build/upgrade/upgrade-next\.md$")
+            self.assertEqual(upgrade.stamped(log)[0], "0.3.2-dev.2")
+            git(log, "reset", "-q", "--hard")   # back to 0.3.0
+            rc, out = upgrade.plan(log)   # a release plan after a Dev build's: no Dev ref stays behind
+            self.assertEqual(rc, 0, out)
+            self.assertNotIn("-dev.", git(log, "for-each-ref", upgrade.REFS))
+            calls.clear()
+            rc, out = upgrade.plan(dev_log)   # a Log on a Dev build, by default: the newest release is older
+            self.assertEqual(fetched(), [self.url, eng_url])
+            self.assertEqual(rc, 0, out)
+            self.assertTrue(out[-1].startswith("OK: this Log is at 0.3.2-dev.1, the target is 0.3.1"), out)
+            self.assertIn("--to", out[-1])
+        finally:
+            upgrade.URL, upgrade.DEV_URL, upgrade.git = saved
+
+    def test_dev_refusals(self):
+        self.dev_builds()
+        log = self.log("0.3.2-dev.2")
+        rc, out = self.plan(log, "--to", "0.3.2-dev.1")   # an older Dev build
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(out, ["stop: the target 0.3.2-dev.1 is older than this Log's version 0.3.2-dev.2: "
+                               "an upgrade goes only forward"])
+        rc, out = self.plan(log, "--to", "0.3.2-dev.9")
+        self.assertEqual(rc, 1, out)
+        self.assertTrue(out[0].startswith("stop: no Dev build v0.3.2-dev.9 at "), out)
+        self.assertIn("0.3.2-dev.1, 0.3.2-dev.2", out[0])
+        self.assertEqual(self.plan(log, "--to", "next")[0], 2)   # `next` is never a target
+        self.assertEqual(self.plan(log, "--to", "0.3.2-dev")[0], 2)
+        rmtree(log)
+        rc, out = self.plan(self.log(edits={"tools/TEMPLATE_VERSION": "0.3.2-dev.5\nsource 0000000\n"}))
+        self.assertEqual(rc, 1, out)
+        self.assertTrue(out[0].startswith("stop: this Log's version 0.3.2-dev.5 has no Dev build tag at "), out)
+
+    def test_version_order(self):
+        order = ["0.2.0", "0.3.1", "0.3.2-dev.1", "0.3.2-dev.2", "0.3.2-dev.10", "0.3.2", "0.4.0-dev.1", "0.4.0"]
+        self.assertEqual(sorted(reversed(order), key=upgrade.key), order)
+        self.assertTrue(upgrade.is_dev("0.3.2-dev.1"))
+        self.assertFalse(upgrade.is_dev("0.3.2"))
+        self.assertFalse(upgrade.VERSION.match("0.3.2-dev.0"))   # Dev builds count from 1, as the export's
+        self.assertFalse(upgrade.SEMVER.match("0.3.2-dev.1"))   # a release, as check.py's update line reads it
 
 
 @unittest.skipUnless(shutil.which("sh"), "no sh on PATH")
