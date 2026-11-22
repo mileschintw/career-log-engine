@@ -463,6 +463,111 @@ class Export(unittest.TestCase):
             git(self.src, "reset", "-q", "--hard", "HEAD~1")
 
 
+NEXT_SCRIPT = os.path.join(REPO, "docs", "upgrades", "upgrade-next.py")
+
+
+def tree_state(root):
+    """Every file under <root> but .git/ and __pycache__/, with its bytes' hash, and the commit HEAD."""
+    import hashlib
+    files = {}
+    for d, dirs, names in os.walk(root):
+        dirs[:] = sorted(x for x in dirs if x not in (".git", "__pycache__"))
+        for n in names:
+            p = os.path.join(d, n)
+            with open(p, "rb") as f:
+                files[os.path.relpath(p, root).replace(os.sep, "/")] = hashlib.sha256(f.read()).hexdigest()
+    head = subprocess.run(["git", "-C", root, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, text=True).stdout
+    return files, head.strip()
+
+
+def run_again(log, script=NEXT_SCRIPT):
+    """Run a guide's script a second time on <log>, which the guide already migrated: `--apply`, then a
+    plain run. Return its faults, none when the run changed no file, made no commit, printed no `done:`
+    line and nothing on stderr, and both runs end with `OK: nothing left to migrate` (docs/maintaining.md
+    › Log format changes: a guide can be run again)."""
+    faults = []
+    before = tree_state(log)
+    for args in (["--apply"], []):
+        r = subprocess.run([sys.executable, "-I", script, log, *args], capture_output=True,
+                           encoding="utf-8", errors="replace")
+        lines = r.stdout.splitlines()
+        name = " ".join(["upgrade-next.py"] + args)
+        if r.stderr.strip():
+            faults.append("%s: stderr: %s" % (name, r.stderr.strip().splitlines()[-1]))
+        faults += ["%s: %s" % (name, line) for line in lines if line.startswith("done:")]
+        if r.returncode != 0 or not lines or lines[-1] != "OK: nothing left to migrate":
+            faults.append("%s: exit %d, last line %r" % (name, r.returncode, lines[-1] if lines else ""))
+    after = tree_state(log)
+    for path in sorted(set(before[0]) | set(after[0])):
+        if before[0].get(path) != after[0].get(path):
+            faults.append("changed: %s" % path)
+    if before[1] != after[1]:
+        faults.append("changed: HEAD")
+    return faults
+
+
+def migrated_log(tmp):
+    """A Log in this source's formats, so one the pending guide has nothing left to migrate in: the
+    export of HEAD, setup's config.toml and an entry with a Story, written by the export's own tools."""
+    out = os.path.join(tmp, "export")
+    r = subprocess.run(["sh", "tools/export-template.sh", out], cwd=REPO, capture_output=True,
+                       encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        raise AssertionError("export failed:\n" + r.stdout + r.stderr)
+    log = os.path.join(tmp, "log")
+    init(log)
+    shutil.copytree(out, log, dirs_exist_ok=True)
+
+    def tool(*args):
+        subprocess.run([sys.executable, "-I", *args, "--root", log], cwd=log, check=True, capture_output=True)
+    tool("tools/config.py", "init")
+    tool("tools/config.py", "set", "update_check", "off")
+    tool("tools/entries.py", "new", "library", "--month", "2024-01", "--status", "imported",
+         "--field", "title=Example Co — Shared library", "--field", "type=work", "--field", "period=2024-01 – 2025-06")
+    tool("tools/entries.py", "story-add", "Proudest project", "entries/2024-01-library.md#my-contribution",
+         "--summary", "started the shared library")
+    git(log, "add", "-A")
+    git(log, "commit", "-q", "-m", "a migrated Log")
+    return log
+
+
+class NextGuide(unittest.TestCase):
+    """Guide cases: the pending guide, docs/upgrades/upgrade-next.*, can be run again on a Log it
+    already migrated (ADR 0015: a Log that follows dev builds runs it on each of them)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        rmtree(self.tmp)
+
+    def test_next_guide_runs_again_on_a_migrated_log(self):
+        log = migrated_log(self.tmp)
+        self.assertEqual(run_again(log), [])
+
+    def test_a_step_that_cannot_run_again_fails(self):
+        # the rule's own test: a check that appends on every --apply is caught
+        bad = os.path.join(self.tmp, "upgrade-bad.py")
+        with open(NEXT_SCRIPT, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("\nCHECKS = []\n", text)
+        with open(bad, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text.replace("\nCHECKS = []\n", (
+                "\ndef check_note(root, apply):\n"
+                "    if apply:\n"
+                "        with open(os.path.join(root, 'notes.md'), 'a', encoding='utf-8') as f:\n"
+                "            f.write('migrated\\n')\n"
+                "        return [('done', 'notes.md: a line added')]\n"
+                "    return []\n\n"
+                "CHECKS = [check_note]\n"), 1))
+        log = os.path.join(self.tmp, "log")
+        init(log)
+        write(log, {"notes.md": "a note\n"})
+        git(log, "add", "-A")
+        git(log, "commit", "-q", "-m", "a Log")
+        self.assertEqual(run_again(log, bad), ["upgrade-next.py --apply: done: notes.md: a line added", "changed: notes.md"])
+
+
 class Source(unittest.TestCase):
     """The tool against this repo's own export (skipped in a Template, which has the same files)."""
 
@@ -572,5 +677,26 @@ class Source(unittest.TestCase):
         self.assertLess(upgrade.key(upgrade.FLOOR), upgrade.key(upgrade.BRIDGE))
 
 
+def main_rerun(argv):
+    """`test_upgrade.py rerun <log>`: run_again on a copy of <log>, the scratch Log the pending guide's
+    test-next.sh built and the upgrade mode then migrated; the Log itself is left as it is."""
+    if len(argv) != 1 or not os.path.isdir(os.path.join(argv[0], ".git")):
+        print("usage: test_upgrade.py rerun <log>, <log> a Log the pending guide migrated")
+        return 2
+    tmp = tempfile.mkdtemp()
+    try:
+        log = os.path.join(tmp, "log")
+        shutil.copytree(argv[0], log, symlinks=True)
+        faults = run_again(log)
+    finally:
+        rmtree(tmp)
+    for fault in faults:
+        print("FAIL: " + fault)
+    print("FAIL: the guide cannot run again" if faults else "OK: the guide ran again with no change")
+    return 1 if faults else 0
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["rerun"]:
+        sys.exit(main_rerun(sys.argv[2:]))
     unittest.main()
