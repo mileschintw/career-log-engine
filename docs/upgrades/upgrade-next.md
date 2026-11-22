@@ -2,7 +2,7 @@
 
 For the agent running the upgrade mode (`skills/career-log/modes/upgrade.md`) at this release's step. The mode has replaced the Engine with this release's and copied this guide and its script into `<root>/.build/upgrade/`; follow the steps below with the user, in order, then go back to the mode. Talk to the user in their language; the files stay in the Log's record language.
 
-Placeholders: `<root>` is the Log's root, `<py>` the Python the mode uses, `<script>` is `<root>/.build/upgrade/upgrade-next.py`. The script prints one line per thing the Log still has in the old format; each line starts with its kind: `apply:` its `--apply` makes the change, `migrate:` you make it by hand, `ask:` the user decides, `review:` you show it to the user, who may keep it as it is, `later:` it waits for a later mode, `done:` `--apply` changed it. It exits 1 while an `apply:`, `migrate:` or `ask:` line is left, and 0 with `OK: nothing left to migrate`.
+Placeholders: `<root>` is the Log's root, `<py>` the Python the mode uses, `<script>` is `<root>/.build/upgrade/upgrade-next.py`. The script prints one line per thing the Log still has in the old format; each line starts with its kind: `apply:` its `--apply` makes the change, `migrate:` you make it by hand, `ask:` the user decides, `review:` you show it to the user, who may keep it as it is, `later:` it waits for a later mode, `done:` `--apply` changed it. It exits 1 while an `apply:`, `migrate:` or `ask:` line is left, and 0 with `OK: nothing left to migrate`. Every step can be run again: on a Log it already migrated, it changes nothing and the script prints `OK: nothing left to migrate`.
 
 ## Changes
 
