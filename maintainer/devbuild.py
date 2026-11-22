@@ -82,10 +82,16 @@ def export(root, version, out):
 
 
 def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows."""
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
+    """shutil.rmtree that also removes git's read-only object files on Windows, and takes a file
+    already gone (removed by a git process still running there) as removed."""
+    def retry(func, p, exc):
+        if isinstance(exc, FileNotFoundError) or (isinstance(exc, tuple) and exc[0] is FileNotFoundError):
+            return
+        try:
+            os.chmod(p, 0o700)
+            func(p)
+        except FileNotFoundError:
+            pass
     if sys.version_info >= (3, 12):
         shutil.rmtree(path, onexc=retry)
     else:
@@ -152,7 +158,10 @@ def build(a):
         carrier = git(stage, "-c", "user.name=devbuild", "-c", "user.email=devbuild@localhost",
                       "commit-tree", tree, "-m", "export")   # only carries the tree to dest
         git(stage, "update-ref", "refs/heads/export", carrier)
-        git(dest, "fetch", "-q", "--no-tags", stage, "refs/heads/export")
+        # no automatic maintenance: a fetch starts `git maintenance run --auto`, whose gc detaches and
+        # can still be repacking dest when the command returns
+        git(dest, "-c", "maintenance.auto=false", "-c", "gc.auto=0", "fetch", "-q", "--no-tags", stage,
+            "refs/heads/export")
     finally:
         rmtree(tmp)
     message = "Dev build %s\n\nExported from career-log-engine %s\n" % (version, source)

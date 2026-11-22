@@ -62,7 +62,9 @@ class Build(unittest.TestCase):
         # here or in the new <dest>'s case below
         self.global_config = os.path.join(self.tmp, "gitconfig")
         with open(self.global_config, "w", encoding="utf-8") as f:
-            f.write("[user]\n\tuseConfigOnly = true\n")
+            # and no automatic maintenance: the commits and fetches here would start a gc that detaches
+            # and can still be repacking a repository when tearDown removes it
+            f.write("[user]\n\tuseConfigOnly = true\n[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n")
         self.env = unittest.mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": self.global_config})
         self.env.start()
         self.src, self.dest, self.rel = (os.path.join(self.tmp, n) for n in ("src", "dest", "rel"))
