@@ -38,7 +38,7 @@ Entries appear here as you log them.
 | Period | Entry | Type | Status |
 |---|---|---|---|
 
-## Upstream
+## Engine repo
 
 This repo was created from the Template at https://github.com/mileschintw/career-log-template, which is the export of the Engine repo, https://github.com/mileschintw/career-log-engine. Report a changed chat-export format or a broken step in the Engine repo, as an [issue](https://github.com/mileschintw/career-log-engine/issues) or a pull request: it is where every fix is made, and the Template takes none. Issues are public: include keys and shapes only, never your records. The import mode drafts the report for you and asks before posting ([import-chats.md](skills/career-log/modes/import-chats.md), step 8).
 
