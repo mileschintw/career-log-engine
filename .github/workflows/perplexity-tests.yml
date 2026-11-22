@@ -41,3 +41,4 @@ jobs:
           node-version: "22"
       - name: Run tools/tests/test_perplexity.py
         run: python -I tools/tests/test_perplexity.py -v
+# Touched by the first CI check of this repo, to start every workflow once; not for merge.

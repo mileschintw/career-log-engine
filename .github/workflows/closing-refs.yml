@@ -40,3 +40,4 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: python3 -I .github/workflows/closing_refs.py "$REPO" "$PR"
+# Touched by the first CI check of this repo, to start every workflow once; not for merge.

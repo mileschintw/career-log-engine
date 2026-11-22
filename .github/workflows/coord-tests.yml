@@ -39,3 +39,4 @@ jobs:
         run: python -I maintainer/tests/test_coord.py -v
       - name: Run maintainer/tests/test_closing_refs.py
         run: python -I maintainer/tests/test_closing_refs.py -v
+# Touched by the first CI check of this repo, to start every workflow once; not for merge.

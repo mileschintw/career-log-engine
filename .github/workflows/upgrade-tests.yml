@@ -44,3 +44,4 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Run tools/tests/test_upgrade.py
         run: python -I tools/tests/test_upgrade.py -v
+# Touched by the first CI check of this repo, to start every workflow once; not for merge.

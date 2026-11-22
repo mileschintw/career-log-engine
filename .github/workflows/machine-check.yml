@@ -101,3 +101,4 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/setup.ps1).Path, [ref]$null, [ref]$errors) | Out-Null
           $errors | ForEach-Object { Write-Output "::error file=tools/setup.ps1,line=$($_.Extent.StartLineNumber)::$($_.Message)" }
           if ($errors.Count -gt 0) { exit 1 }
+# Touched by the first CI check of this repo, to start every workflow once; not for merge.
