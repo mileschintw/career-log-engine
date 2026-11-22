@@ -13,7 +13,7 @@ One person's career records: entries, sources, outputs, profile, direction, stor
 _Avoid_: data, content, my repo
 
 **Template**:
-A shareable repo holding the Engine and an empty Log skeleton, from which someone starts their own private Log. It is the export of the **Engine repo** and takes no issue or pull request: its issue forms and front page send them to the Engine repo, where every fix is made ([ADR 0015](docs/adr/0015-the-engine-is-developed-in-its-own-public-repo.md)).
+A shareable repo holding the Engine and an empty Log skeleton, from which someone starts their own private Log. It is the export of the **Engine repo**, where every fix is made: its issue forms and front page send issues and pull requests there ([ADR 0015](docs/adr/0015-the-engine-is-developed-in-its-own-public-repo.md)).
 _Avoid_: clean version, starter, fork
 
 **Release**:
