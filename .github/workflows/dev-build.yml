@@ -14,11 +14,9 @@ on:
 permissions:
   contents: write
 
-# One build at a time, in merge order; a newer push never cancels a build under way
-concurrency:
-  group: dev-build
-  cancel-in-progress: false
-
+# No concurrency group: GitHub keeps one pending run per group and drops the rest, so a merge would
+# get no build. Runs at the same time race instead; the loser's atomic push is refused, and it builds
+# again on top of the winner's, with the next <n>.
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,5 +32,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git ls-remote --exit-code --heads origin builds > /dev/null; then git fetch --no-tags origin +refs/heads/builds:refs/heads/builds; fi
-          python -I maintainer/devbuild.py . --push origin
+          for attempt in 1 2 3 4 5; do
+            # origin's tags and builds branch as they are now, dropping a tag a refused push left here
+            git fetch -q --force --prune --prune-tags origin "+refs/tags/*:refs/tags/*"
+            if git ls-remote --exit-code --heads origin builds > /dev/null; then
+              git fetch -q --no-tags --force origin +refs/heads/builds:refs/heads/builds
+            else
+              git update-ref -d refs/heads/builds || true
+            fi
+            if python -I maintainer/devbuild.py . --push origin; then exit 0; fi
+            sleep $((attempt * 10))
+          done
+          exit 1

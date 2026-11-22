@@ -80,6 +80,17 @@ def export(root, version, out):
         raise Fail("tools/export-template.sh failed (exit %d): %s" % (p.returncode, (p.stderr or "").strip()))
 
 
+def rmtree(path):
+    """shutil.rmtree that also removes git's read-only object files on Windows."""
+    def retry(func, p, _):
+        os.chmod(p, 0o700)
+        func(p)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=retry)
+    else:
+        shutil.rmtree(path, onerror=retry)
+
+
 def stage_tree(root, source, out, stage):
     """The export's tree, written in a scratch repository at stage with the source commit's file modes."""
     git(os.path.dirname(stage), "init", "-q", stage)
@@ -133,15 +144,15 @@ def build(a):
         out, stage = os.path.join(tmp, "export"), os.path.join(tmp, "stage")
         export(root, version, out)
         tree = stage_tree(root, source, out, stage)
-        scratch = git(stage, "-c", "user.name=devbuild", "-c", "user.email=devbuild@localhost",
+        carrier = git(stage, "-c", "user.name=devbuild", "-c", "user.email=devbuild@localhost",
                       "commit-tree", tree, "-m", "export")   # only carries the tree to dest
-        git(stage, "update-ref", "refs/heads/export", scratch)
+        git(stage, "update-ref", "refs/heads/export", carrier)
         git(dest, "fetch", "-q", "--no-tags", stage, "refs/heads/export")
     finally:
-        shutil.rmtree(tmp, onerror=lambda f, p, _: (os.chmod(p, 0o700), f(p)))
+        rmtree(tmp)
     message = "Dev build %s\n\nExported from career-log-engine %s\n" % (version, source)
     commit = git(dest, "commit-tree", tree, *(["-p", parent] if parent else []), "-m", message)
-    git(dest, "update-ref", "-m", "dev build " + version, ref, commit, parent or "0" * 40)
+    git(dest, "update-ref", "-m", "dev build " + version, ref, commit, parent or "")   # "": must not exist yet
     git(dest, "tag", "-a", tag, "-m", "Dev build %s of career-log-engine %s" % (version, source), commit)
     print("dev build: %s" % tag)
     print("commit: %s on %s" % (commit, a.branch))

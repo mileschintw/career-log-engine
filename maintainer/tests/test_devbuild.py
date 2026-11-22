@@ -16,12 +16,7 @@ devbuild = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(devbuild)
 
 
-def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows."""
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
-    shutil.rmtree(path, onerror=retry)
+rmtree = devbuild.rmtree
 
 
 def git(cwd, *args):
@@ -118,7 +113,7 @@ class Build(unittest.TestCase):
         tar = os.path.join(self.tmp, "got.tar")
         git(self.dest, "archive", "-o", tar, "v0.4.1-dev.1")
         with tarfile.open(tar) as t:
-            t.extractall(got, filter="tar")
+            t.extractall(got, **({"filter": "tar"} if hasattr(tarfile, "tar_filter") else {}))   # 3.11.4+
         self.assertEqual(diff(want, got), [])
         with open(os.path.join(got, "tools", "TEMPLATE_VERSION"), encoding="utf-8") as f:
             self.assertEqual(f.read().splitlines(), ["0.4.1-dev.1", "source " + git(self.src, "rev-parse", "HEAD")])
@@ -144,9 +139,10 @@ class Build(unittest.TestCase):
         rc, out, err = self.build()
         self.assertEqual(rc, 0, out + err)
         self.assertIn("dev build: v0.5.0-dev.1", out)
-        rc, out = run_export(self.src, "--version", "0.5.0", os.path.join(self.tmp, "rel-export"))
-        self.assertEqual(rc, 1, out)   # a release is still refused
-        self.assertIn("holds a Log format change or a new setting", out)
+        out = io.StringIO()
+        with redirect_stdout(out), self.assertRaises(devbuild.Fail):   # a release is still refused
+            devbuild.export(self.src, "0.5.0", os.path.join(self.tmp, "rel-export"))
+        self.assertIn("holds a Log format change or a new setting", out.getvalue())
 
     def test_push(self):
         remote = os.path.join(self.tmp, "remote.git")
@@ -176,8 +172,7 @@ class Build(unittest.TestCase):
         self.assertIn("checked out", err)
         os.makedirs(os.path.join(self.dest, "sub"))
         with open(os.path.join(self.dest, "sub", "f.txt"), "w") as f:   # not empty: never made a repo
-            f.write("x
-")
+            f.write("x\n")
         rc, out, err = run(os.path.join(self.dest, "sub"), "--root", self.src, "--releases", self.rel)
         self.assertEqual(rc, 1)
         self.assertIn("not the top", err)
@@ -196,14 +191,6 @@ def diff(a, b):
         if not filecmp.cmp(os.path.join(a, p), os.path.join(b, p), shallow=False):
             out.append(p)
     return out
-
-
-def run_export(root, *args):
-    sh, extra = devbuild.coord.find_sh()
-    env = dict(os.environ, PATH=extra + os.pathsep + os.environ.get("PATH", "")) if extra else None
-    p = subprocess.run([sh, "tools/export-template.sh", *args], cwd=root, env=env, capture_output=True,
-                       encoding="utf-8", errors="replace")
-    return p.returncode, p.stdout
 
 
 if __name__ == "__main__":
