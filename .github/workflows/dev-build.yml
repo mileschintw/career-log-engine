@@ -1,0 +1,38 @@
+# Makes a Dev build on each push to master, a merged pull request's included: the export of that
+# commit, committed to the builds branch and tagged v<next version>-dev.<n> (maintainer/devbuild.py,
+# docs/publishing.md › Dev builds). It pushes only that branch and that tag, here; the Template never
+# gets a Dev build. Its test, maintainer/tests/test_devbuild.py, runs in coord-tests.yml.
+# Linux only, on the oldest Python SETUP.md supports (3.11): it runs no code of the user's machine.
+# This repo's own CI: never exported to the Template.
+name: Dev build
+
+on:
+  push:
+    branches: [master]
+
+# Writes the builds branch and a tag; nothing else
+permissions:
+  contents: write
+
+# One build at a time, in merge order; a newer push never cancels a build under way
+concurrency:
+  group: dev-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the tags, for the next <n>
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Make the Dev build and push it
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin builds > /dev/null; then git fetch --no-tags origin +refs/heads/builds:refs/heads/builds; fi
+          python -I maintainer/devbuild.py . --push origin

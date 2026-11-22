@@ -216,6 +216,11 @@ GROUPS = [
     ], [
         py("maintainer/tests/test_coord.py"),
     ]),
+    ("dev build", "coord-tests.yml", [
+        "maintainer/devbuild.py", "maintainer/tests/test_devbuild.py", "maintainer/coord.py", "tools/export-template.sh",
+    ], [
+        py("maintainer/tests/test_devbuild.py"),
+    ]),
     ("closing refs", "coord-tests.yml", [
         ".github/workflows/closing_refs.py", "maintainer/tests/test_closing_refs.py",
     ], [

@@ -111,7 +111,8 @@ class Build(unittest.TestCase):
         rc, out, err = self.build()
         self.assertEqual(rc, 0, out + err)
         want = os.path.join(self.tmp, "export")
-        devbuild.export(self.src, "0.4.1-dev.1", want)
+        with redirect_stdout(io.StringIO()):
+            devbuild.export(self.src, "0.4.1-dev.1", want)
         got = os.path.join(self.tmp, "got")
         os.makedirs(got)
         tar = os.path.join(self.tmp, "got.tar")
@@ -143,7 +144,7 @@ class Build(unittest.TestCase):
         rc, out, err = self.build()
         self.assertEqual(rc, 0, out + err)
         self.assertIn("dev build: v0.5.0-dev.1", out)
-        rc, out, err = run_export(self.src, "--version", "0.5.0", os.path.join(self.tmp, "rel-export"))
+        rc, out = run_export(self.src, "--version", "0.5.0", os.path.join(self.tmp, "rel-export"))
         self.assertEqual(rc, 1, out)   # a release is still refused
         self.assertIn("holds a Log format change or a new setting", out)
 
@@ -174,6 +175,9 @@ class Build(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("checked out", err)
         os.makedirs(os.path.join(self.dest, "sub"))
+        with open(os.path.join(self.dest, "sub", "f.txt"), "w") as f:   # not empty: never made a repo
+            f.write("x
+")
         rc, out, err = run(os.path.join(self.dest, "sub"), "--root", self.src, "--releases", self.rel)
         self.assertEqual(rc, 1)
         self.assertIn("not the top", err)
