@@ -1,0 +1,16 @@
+# Engine testing works in phases: features, a refactor, then model compatibility
+
+An Engine change is tested in one of three phases, in order. In the feature phase, while the planned features are still being built, a change is tested on the model the session runs on, each test case run once, and it passes when the feature works and the user can use it. Once the features are done, the refactor phase moves the skill's deterministic steps, the ones a script can do the same way every time, out of the instructions and into tools. Only then does the model compatibility phase measure the rules on a cheaper model: each mode's representative case runs once on Sonnet, the lowest model tested (#72), a case that depends on the agent's project or config folder runs the agent as its own process (#139), and fixing by wording stops once a fix has targeted the same failure twice and it fails again. Haiku is not a target ([ADR 0008](0008-sonnet-is-the-lowest-supported-model.md)). This phase measures how well a model follows the text's rules, and while features are still landing, the next feature or the refactor rewrites that text and voids the runs made on it, so runs made before then are wasted. The refactor also takes rules out of the text: a step a tool does needs no wording a cheaper model must follow, so the runs after it measure fewer rules, and only the ones that stay.
+
+Amended (#476): the model compatibility phase replaced the tuning phase this ADR first planned (Haiku and Sonnet rounds of three runs per check), once the maintainer stopped targeting Haiku (#72).
+
+Amended (#126): the Haiku-era rules were left as they are; the ablation measured the #518 and #519 rules on Opus instead, and Haiku ran one reference round. Both results are in [ADR 0008](0008-sonnet-is-the-lowest-supported-model.md).
+
+<!-- source-only -->
+In this repo, the model compatibility phase's bar is `docs/maintaining-tests.md › Test bar` and `› Stop rule`, and how a run starts as its own process is `› A run as its own process`; the refactor is issue #171.
+<!-- /source-only -->
+
+## Considered options
+
+- **Keep the cheap-model bar throughout**: every change passes Haiku and Sonnet rounds before it merges. It catches weak wording early, but most of the wording it tunes is rewritten by a later feature or by the refactor, and each rewrite voids the runs.
+- **Drop cheap-model tuning altogether**: test only on the session's own model. It costs less, but a strong model reads past ambiguous wording that still makes it fail now and then; cheaper models fail on that wording reliably, so they find it, and a skill tuned on them can also be run on them for less.

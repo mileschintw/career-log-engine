@@ -1,0 +1,38 @@
+# Runs the tests of the maintainer's test harness (maintainer/harness.py: scratch copies of the Log
+# for clean-agent runs, their rows and grades, and the records folder's snapshots).
+# Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11). Its Windows code
+# (junctions, ending a process) is left to the session that changes it, which runs these tests on
+# the maintainer's own machine (SETUP.md step 7), where the harness runs: Windows took four minutes
+# here, billed twice (the user's call, #543).
+# This repo's own CI: never exported to the Template.
+name: Harness tests
+
+on:
+  pull_request:
+    paths:
+      - "maintainer/harness.py"
+      - "maintainer/tests/test_harness.py"
+      - "tools/logfiles.py"
+      - "tools/config.py"
+      - "tools/config.default.toml"
+      - ".github/workflows/harness-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run maintainer/tests/test_harness.py
+        run: python -I maintainer/tests/test_harness.py -v

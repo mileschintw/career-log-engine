@@ -1,0 +1,41 @@
+# Runs the tests of the maintainer's coordination tools (maintainer/coord.py: blocked-by marks and a
+# Template release's staging; .github/workflows/closing_refs.py's check).
+# Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11). Its Windows code
+# (Git for Windows' sh) is left to the session that changes it, which runs these tests on the
+# maintainer's own machine (SETUP.md step 7): Windows took four minutes here, billed twice (the
+# user's call, #543).
+# This repo's own CI: never exported to the Template.
+name: Coord tests
+
+on:
+  pull_request:
+    paths:
+      - "maintainer/coord.py"
+      - "maintainer/tests/test_coord.py"
+      - "maintainer/tests/test_closing_refs.py"
+      - "tools/export-template.sh"
+      - ".github/workflows/closing_refs.py"
+      - "tools/deny_coverage.py"
+      - ".github/workflows/coord-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run maintainer/tests/test_coord.py
+        run: python -I maintainer/tests/test_coord.py -v
+      - name: Run maintainer/tests/test_closing_refs.py
+        run: python -I maintainer/tests/test_closing_refs.py -v

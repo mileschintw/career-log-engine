@@ -1,0 +1,46 @@
+# Runs the tests of the application tool (tools/application.py) and of the writing-rules lint it runs
+# (tools/writing_lint.py): two groups of tools/checks_for.py's map, one job, since their paths: overlap.
+# Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11): neither tool has a
+# Windows-only code path (the helpers they share, tools/logfiles.py, are tested on Windows by
+# entries-tests.yml), and the session that changes them runs these tests on its own platform too
+# (SETUP.md step 7).
+# This repo's own CI: never exported to the Template.
+name: Application tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/application.py"
+      - "tools/writing_lint.py"
+      - "tools/entries.py"
+      - "tools/logfiles.py"
+      - "tools/check_save.py"
+      - "tools/resume.py"
+      - "skills/career-log/writing.md"
+      - "tools/tests/test_application.py"
+      - "tools/tests/test_writing_lint.py"
+      - ".github/workflows/application-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # The test steps run even when one fails, so one run reports them all.
+      - name: Run tools/tests/test_application.py
+        run: python -I tools/tests/test_application.py -v
+      - name: Run tools/tests/test_writing_lint.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_writing_lint.py -v

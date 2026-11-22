@@ -1,0 +1,46 @@
+# Runs the tests of the upgrade tool (tools/upgrade.py: the plan, the Engine replacement per release,
+# the merge of a Log's own Engine edits)
+# on Linux (standing in for macOS) and Windows, the platforms the Log is developed on (SKILL.md › Platforms):
+# it keeps a file's CRLF line endings and runs sh, and once failed on Windows only (#357). Linux runs the
+# oldest Python SETUP.md supports (3.11), Windows a current one.
+# This repo's own CI: never exported to the Template.
+name: Upgrade tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/upgrade.py"
+      - "tools/tests/test_upgrade.py"
+      - "tools/export-template.sh"
+      - "docs/upgrades/**"
+      - "tools/config.py"
+      - "tools/logfiles.py"
+      - ".github/workflows/upgrade-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run tools/tests/test_upgrade.py
+        run: python -I tools/tests/test_upgrade.py -v

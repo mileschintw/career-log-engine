@@ -1,0 +1,103 @@
+# Runs the tests of the trigger-time check (tools/check.py) and of the Config tool it reads
+# config.toml through (tools/config.py): two groups of tools/checks_for.py's map, one job, since both
+# run tools/tests/test_check.py (a third, setup scripts, holds the parse steps below). On Linux
+# (standing in for macOS) and Windows, the platforms the Log is developed on (SKILL.md › Platforms):
+# check.py finds and installs tools in Windows's own places (winget, packaged apps' stores, Edge for
+# Chrome) and some of its tests run on Windows only. Linux
+# runs the oldest Python SETUP.md supports (3.11, which tools/check.py needs for tomllib), Windows a
+# current one.
+# It also runs when the setup scripts (tools/setup.sh, tools/setup.ps1) change: the scripts write
+# the machine.toml that tools/check.py reads, and check.py prints commands that name them. The tests
+# do not run the scripts, so the job also parses them without running them (#179): sh -n on Linux
+# for tools/setup.sh (dash, which also rejects some bash-only syntax, such as arrays), and the
+# PowerShell parser on Windows for setup.ps1, in both PowerShell 7 and Windows PowerShell 5.1,
+# since a user may start it from either. A parse catches syntax errors only; SETUP.md step 7 says how to check the scripts'
+# behaviour by hand.
+# The Next up block (`check.py done`) reads the flows table of docs/guide.md through tools/guide.py
+# and the examples of SKILL.md › Modes, so the tests run when those change too.
+# tools/speech.py (#707) is a fourth group: check.py offers and detects it, and its own tests need no
+# backend.
+# This repo's own CI: never exported to the Template.
+name: Machine check tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/check.py"
+      - "tools/resume.py"
+      - "tools/entries.py"
+      - "tools/logfiles.py"
+      - "tools/upgrade.py"
+      - "tools/config.py"
+      - "tools/config.default.toml"
+      - "tools/tests/test_check.py"
+      - "tools/tests/test_config.py"
+      - "tools/template/README.md"
+      - "tools/template/README.zh-TW.md"
+      - "tools/template/direction.md"
+      - "tools/guide.py"
+      - "docs/guide.md"
+      - "skills/career-log/SKILL.md"
+      - "skills/career-log/start.py"
+      - "tools/setup.sh"
+      - "tools/setup.ps1"
+      - "tools/speech.py"
+      - "tools/speech-requirements.txt"
+      - "tools/tests/test_speech.py"
+      - "tools/tests/speech/**"
+      - ".github/workflows/machine-check.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run tools/tests/test_config.py
+        run: python -I tools/tests/test_config.py -v
+      # The steps after it run even when one fails, so one run reports them all.
+      - name: Run tools/tests/test_check.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_check.py -v
+      # tools/speech.py's shared layer, from a JSON fixture: no backend, no recording (#707)
+      - name: Run tools/tests/test_speech.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_speech.py -v
+      - name: Parse tools/setup.sh (sh -n)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: sh -n tools/setup.sh
+      - name: Parse tools/setup.ps1 (PowerShell 7)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/setup.ps1).Path, [ref]$null, [ref]$errors) | Out-Null
+          $errors | ForEach-Object { Write-Output "::error file=tools/setup.ps1,line=$($_.Extent.StartLineNumber)::$($_.Message)" }
+          if ($errors.Count -gt 0) { exit 1 }
+      - name: Parse tools/setup.ps1 (Windows PowerShell 5.1)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: powershell
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/setup.ps1).Path, [ref]$null, [ref]$errors) | Out-Null
+          $errors | ForEach-Object { Write-Output "::error file=tools/setup.ps1,line=$($_.Extent.StartLineNumber)::$($_.Message)" }
+          if ($errors.Count -gt 0) { exit 1 }

@@ -1,0 +1,56 @@
+# Runs the tests of the scan tool (tools/scan.py: report names, dedup, pruning, the pending list, ranking),
+# of the map's format (tools/fit.py), of the dashboard page built from them (tools/dashboard.py) and of the
+# visa sponsorship records they rank with (tools/sponsorship.py): four groups of tools/checks_for.py's map,
+# one job, since their paths: are nearly the same.
+# Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11): these tools have no
+# Windows-only code path (the helpers they share, tools/logfiles.py, are tested on Windows by
+# entries-tests.yml), and the session that changes them runs these tests on its own platform too
+# (SETUP.md step 7).
+# This repo's own CI: never exported to the Template.
+name: Scan tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/scan.py"
+      - "tools/fit.py"
+      - "tools/dashboard.py"
+      - "tools/sponsorship.py"
+      - "tools/entries.py"
+      - "tools/logfiles.py"
+      - "tools/config.py"
+      - "tools/tests/test_scan.py"
+      - "tools/tests/test_fit.py"
+      - "tools/tests/test_dashboard.py"
+      - "tools/tests/test_sponsorship.py"
+      - ".github/workflows/scan-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # The test steps run even when one fails, so one run reports them all.
+      - name: Run tools/tests/test_scan.py
+        run: python -I tools/tests/test_scan.py -v
+      - name: Run tools/tests/test_fit.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_fit.py -v
+      - name: Run tools/tests/test_dashboard.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_dashboard.py -v
+      - name: Run tools/tests/test_sponsorship.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_sponsorship.py -v

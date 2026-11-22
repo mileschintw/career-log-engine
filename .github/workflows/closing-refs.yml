@@ -1,0 +1,42 @@
+# Fails when a pull request would close anything other than the issues on its `Closes #N` lines, or
+# when one of them is a pull request (closing_refs.py). The job runs only when the body holds a
+# closing keyword (close, fix, resolve: contains() ignores case) and, on an edit, only when the body
+# changed. A pull request whose body holds no closing keyword closes nothing, so it is skipped; one
+# whose body holds one is checked, including one that changes closing_refs.py. An issue linked by
+# hand in the sidebar, with no keyword in the body, goes unchecked. This repo's own CI: never
+# exported to the Template.
+name: Closing references
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  check:
+    if: >-
+      (github.event.action != 'edited' || github.event.changes.body != null) &&
+      (contains(github.event.pull_request.body, 'close') ||
+       contains(github.event.pull_request.body, 'fix') ||
+       contains(github.event.pull_request.body, 'resolve'))
+    # On the job, not the workflow, so a run whose job is skipped (a title edit) cancels nothing.
+    # A new push or body edit cancels the check still going for the previous one.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/workflows
+      - name: Compare closingIssuesReferences with the Closes lines
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: python3 -I .github/workflows/closing_refs.py "$REPO" "$PR"

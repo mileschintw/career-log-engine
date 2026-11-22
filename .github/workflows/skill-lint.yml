@@ -1,0 +1,50 @@
+# Checks that every link, `file.md › Section` and `file.md step N` reference in the skill, the guide
+# and the Template's front page resolves, that the guide's generated tables are current, and that
+# no mode name outside SKILL.md's modes table is left in the skill (tools/skill_lint.py), on the
+# oldest Python SETUP.md supports. This repo's own CI: never exported to the Template.
+name: Skill lint
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+      - "tools/template/**"
+      - "SETUP.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GLOSSARY.md"
+      - "entries/_template.md"
+      - "docs/adr/**"
+      - "docs/guide.md"
+      - "tools/guide.py"
+      - "tools/config.py"
+      - "tools/config.default.toml"
+      - "tools/logfiles.py"
+      - "tools/skill_lint.py"
+      - "tools/tests/test_guide.py"
+      - "tools/tests/test_skill_lint.py"
+      - ".github/workflows/skill-lint.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run tools/tests/test_guide.py
+        run: python -I tools/tests/test_guide.py -v
+      - name: Run tools/tests/test_skill_lint.py
+        run: python -I tools/tests/test_skill_lint.py -v
+      - name: Run tools/skill_lint.py
+        run: python -I tools/skill_lint.py

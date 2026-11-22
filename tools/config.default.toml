@@ -1,0 +1,45 @@
+# How the Engine runs for this Log (Config, GLOSSARY.md). Setup copies this file to the Log root
+# as config.toml; change a value there through setup (skills/career-log/modes/setup.md).
+# A field left out takes the default below.
+
+# The language Log files are written in.
+record_language = "English"
+
+# The language the agent talks to the user in, as a BCP 47 tag with its script and region
+# (zh-Hant-TW: Chinese in traditional characters, with that region's usage); setup writes it from the user's words.
+# Empty: the language the user writes in.
+conversation_language = ""
+
+# Interviewer profiles only signed-in members can see (LinkedIn): "never" or "always".
+interviewer_profiles = "never"
+
+# "full" (the Template's page, both languages) or "trimmed" (a personal index).
+front_page = "full"
+
+# scan (skills/career-log/modes/scan.md): collect only postings posted in the last `window` days
+# (1 to 90); an unattended run uses `scheduled_window` instead ("window": the same as window).
+window = 7
+scheduled_window = "window"
+
+# scan: screen at most `screen_budget` captured postings (1 to 100); the top `fit_budget` of them
+# (1 to 50, never above screen_budget) get a full fit, and the ranking shows the top `n` (1 to 50).
+screen_budget = 40
+fit_budget = 15
+n = 10
+
+# scan: "on" drafts a resume and answers for the top `m` (1 to 20); "off" drafts none.
+auto_write = "off"
+m = 5
+
+# "on": the check every mode runs first says when a newer Template release exists (it asks GitHub
+# at most once a day and sends nothing from the Log); "off" never asks.
+update_check = "on"
+
+# write (skills/career-log/modes/write.md): the most pages a resume may have (1 to 3); tools/resume.py
+# fails a longer one. 2 suits 10+ years of experience.
+resume_max_pages = 1
+
+# fit (skills/career-log/modes/fit-plan-preview.md): after a learning plan, a Plan preview of the resume
+# bullets and heatmap once the planned projects land, kept out of git. "ask" offers it with the plan;
+# "always" makes it; "never" does not.
+plan_preview = "ask"

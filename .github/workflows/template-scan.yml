@@ -1,0 +1,51 @@
+# Builds the shareable Template from an Engine pull request and fails if the export does: a
+# source-only block left open, or a file name or content matching tools/template/.export-deny, the
+# list every Log starts with (this repo holds no Log, so no .export-deny of its own; ADR 0015).
+# This repo's own CI: never exported to the Template.
+name: Template scan
+
+on:
+  pull_request:
+    paths:
+      # The export's ALLOW list (tools/export-template.sh) and its .export-* files, as
+      # tools/checks_for.py reads them; tools/tests/test_checks_for.py fails when they disagree.
+      - "skills/**"
+      - "tools/**"
+      - "SETUP.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GLOSSARY.md"
+      - "docs/guide.md"
+      - "docs/adr/**"
+      - "docs/upgrades/**"
+      - "docs/social-preview/social-preview.svg"
+      - "docs/social-preview/banner.svg"
+      - ".gitattributes"
+      - ".gitignore"
+      - "entries/_template.md"
+      - ".export-deny"
+      - ".export-cleared"
+      - ".github/workflows/template-scan.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export the Template and scan it
+        run: bash tools/export-template.sh "$RUNNER_TEMP/template"
+      # tools/checks_for.py's "tool guards" group: the shared-helper guards scan every tool
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run tools/tests/test_logfiles.py
+        run: python -I tools/tests/test_logfiles.py -v

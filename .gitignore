@@ -1,0 +1,38 @@
+.DS_Store
+.build/
+.worktrees/
+.make_fixtures-*
+.claude/worktrees/
+outputs/**/*.png
+!outputs/reports/*-page/*.png
+__pycache__/
+*.pyc
+
+# fit's Plan preview: goals for planned projects, kept out of git (skills/career-log/modes/fit-plan-preview.md)
+plan-previews/
+
+# Browser capture: playwright-cli's skill and its output stay local (SETUP.md step 5)
+.claude/skills/playwright-cli/
+.agents/skills/playwright-cli/
+.playwright/
+.playwright-cli/
+
+# Raw chat exports stay local; only picked threads move to sources/<origin>/
+sources/inbox/*
+!sources/inbox/.gitkeep
+
+# Recordings of spoken practice stay local: tools/speech.py reads them where they are, and the
+# practice log keeps only what the transcript gave
+*.m4a
+*.mp3
+*.wav
+# Test fixtures are tracked audio, not recordings (#754)
+!tools/tests/fixtures/**/*.wav
+*.aac
+*.ogg
+*.opus
+*.flac
+*.webm
+*.caf
+*.aif
+*.aiff

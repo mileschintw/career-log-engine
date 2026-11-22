@@ -1,0 +1,47 @@
+# Runs the tests of the entry tool (tools/entries.py: what an entry is, its size, its references, its writes)
+# and of the helpers it shares with the other tools (tools/logfiles.py)
+# on Linux (standing in for macOS) and Windows, the platforms the Log is developed on (SKILL.md › Platforms):
+# tools/logfiles.py, which nearly every tool imports, quotes for PowerShell, writes `py -3` and ignores a
+# drive letter's case on Windows. Linux runs the oldest Python SETUP.md supports (3.11), Windows a current one.
+# This repo's own CI: never exported to the Template.
+name: Entries tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/entries.py"
+      - "tools/logfiles.py"
+      - "tools/tests/test_entries.py"
+      - "tools/tests/test_logfiles.py"
+      - "entries/_template.md"
+      - ".github/workflows/entries-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run tools/tests/test_logfiles.py
+        run: python -I tools/tests/test_logfiles.py -v
+      - name: Run tools/tests/test_entries.py
+        run: python -I tools/tests/test_entries.py -v

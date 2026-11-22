@@ -1,0 +1,88 @@
+# Runs the tests of the chat-export parser, of the test-run grader (tools/check_run.py, which imports
+# tools/fit.py), of the save check it shares a rule with (tools/check_save.py, which imports
+# tools/writing_lint.py, tools/resume.py, tools/sponsorship.py and, in one function, tools/dashboard.py,
+# and whose tests read skills/career-log/writing.md) and of tools/resume.py (which
+# reads config.toml through tools/config.py and the example resume it checks): three groups of
+# tools/checks_for.py's map (chat export, check run/save, resume), one job, since their paths: are
+# nearly all shared already.
+# The runners have no TinyTeX or poppler, and this workflow installs neither (a large download), so
+# the resume build cases are skipped and only the checks that need no TeX run here;
+# tools/checks_for.py's check line asks for a run on a machine with both.
+# On Linux (standing in for macOS), the oldest Python SETUP.md supports (3.11), every test. On Windows,
+# a current Python, only tools/tests/test_chat_export.py (the parser finds the agent's project folders
+# by path, with a drive letter's case ignored there) and tools/tests/test_resume.py (resume.py finds
+# TinyTeX and poppler in Windows's own places). test_check_run.py and test_check_save.py took three of
+# Windows's four minutes here, billed twice, for one Windows branch (check_run.py reading a /c/ path as
+# C:/), so they are left to the session that changes them, which runs them on its own platform
+# (SETUP.md step 7).
+# This repo's own CI: never exported to the Template.
+name: Parser tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/chat_export.py"
+      - "tools/tests/test_chat_export.py"
+      - "tools/tests/make_fixtures.py"
+      - "tools/tests/fixtures/**"
+      - "tools/tests/expected/**"
+      - "tools/check_run.py"
+      - "tools/entries.py"
+      - "tools/logfiles.py"
+      - "tools/tests/test_check_run.py"
+      - "tools/check_save.py"
+      - "tools/tests/test_check_save.py"
+      - "tools/writing_lint.py"
+      - "tools/resume.py"
+      - "tools/tex-packages.txt"
+      - "tools/tests/test_resume.py"
+      - "tools/config.py"
+      - "tools/config.default.toml"
+      - "tools/fit.py"
+      - "tools/sponsorship.py"
+      - "tools/dashboard.py"
+      - "tools/sync.py"
+      - "skills/career-log/writing.md"
+      - "skills/career-log/modes/review.md"
+      - "skills/career-log/modes/scan.md"
+      - "skills/career-log/examples/resume.tex"
+      - "skills/career-log/assets/resume-blank.tex"
+      - ".github/workflows/parser-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # The test steps run even when one fails, so one run reports them all.
+      - name: Run tools/tests/test_chat_export.py
+        run: python -I tools/tests/test_chat_export.py -v
+      - name: Run tools/tests/test_check_run.py
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python -I tools/tests/test_check_run.py -v
+      - name: Run tools/tests/test_check_save.py
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python -I tools/tests/test_check_save.py -v
+      - name: Run tools/tests/test_resume.py
+        if: ${{ !cancelled() }}
+        run: python -I tools/tests/test_resume.py -v

@@ -1,0 +1,36 @@
+# Runs the tests of the name-coverage check a Log runs before its export (tools/deny_coverage.py).
+# Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11): it reads text
+# and git output, with no Windows-only code path, and the session that changes it runs these tests on
+# its own platform too (SETUP.md step 7).
+# This repo's own CI: never exported to the Template.
+name: Deny coverage tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/deny_coverage.py"
+      - "tools/entries.py"
+      - "tools/logfiles.py"
+      - "tools/sync.py"
+      - "tools/tests/test_deny_coverage.py"
+      - ".github/workflows/deny-coverage.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run tools/tests/test_deny_coverage.py
+        run: python -I tools/tests/test_deny_coverage.py -v

@@ -1,0 +1,43 @@
+# Runs the tests of the Perplexity capture scripts (tools/perplexity-list.js, perplexity-job.js and
+# perplexity-extras.js) with Node against a made-up API.
+# Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11): the scripts run
+# in the browser's page, with no Windows-only code path, and the session that changes them runs these
+# tests on its own platform too (SETUP.md step 7).
+# This repo's own CI: never exported to the Template.
+name: Perplexity tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/perplexity-list.js"
+      - "tools/perplexity-job.js"
+      - "tools/perplexity-extras.js"
+      - "tools/chat_export.py"
+      - "tools/logfiles.py"
+      - "tools/tests/test_perplexity.py"
+      - "tools/tests/perplexity_fake.js"
+      - "tools/tests/perplexity_harness.js"
+      - ".github/workflows/perplexity-tests.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run tools/tests/test_perplexity.py
+        run: python -I tools/tests/test_perplexity.py -v
