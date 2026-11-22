@@ -148,6 +148,16 @@ class Scan(Repo):
         self.assertIn(": message line 1", out)
         self.assertIn("tag ", out)
 
+    def test_tag_not_sent_is_not_scanned(self):
+        git(self.repo, "tag", "-a", "v0", "-m", "Release for Acme")
+        git(self.repo, "tag", "-a", "v0b", "-m", "Tag of a tag", "v0")
+        self.commit({"a.md": "x\n"}, "Add a")
+        self.assertEqual(self.scan("HEAD", "--not", "v0b")[0], 0)
+        self.assertEqual(self.scan("HEAD", "^v0")[0], 0)
+        rc, out = self.scan("v0b", "--not", "HEAD")   # the inner tag's message, through the outer
+        self.assertEqual(rc, 1)
+        self.assertIn(": message line 1", out)
+
     def test_missing_empty_and_unreadable_deny_list(self):
         self.commit({"a.md": "x\n"}, "Add a")
         rc, out = self.run_main("scan", "--deny", os.path.join(self.tmp, "nope"), "HEAD")
@@ -221,11 +231,17 @@ class Hook(Repo):
         self.commit({"a.md": "x\n"}, "Add a")
         self.assertEqual(self.run_main("hook", "origin", self.remote, stdin=self.line(remote_oid="2" * 40))[0], 0)
 
+    def test_malformed_line(self):
+        self.configure()
+        self.assertEqual(self.run_main("hook", "origin", self.remote, stdin="garbage\n")[0], 1)
+
     def test_check(self):
         rc, out = self.run_main("check")
         self.assertEqual(rc, 1)
         self.assertIn("not active", out)
-        git(self.repo, "config", "core.hooksPath", "maintainer/hooks")
+        git(self.repo, "config", "core.hooksPath", "maintainer/hooks")   # relative: not in every worktree
+        self.assertIn("not active", self.run_main("check")[1])
+        git(self.repo, "config", "core.hooksPath", HOOKS)
         self.assertIn("no deny list configured", self.run_main("check")[1])
         self.configure()
         rc, out = self.run_main("check")

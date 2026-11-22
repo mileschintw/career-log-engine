@@ -15,21 +15,21 @@ The export here runs no name-coverage check and masks nothing: with no Log besid
 
 A push from the maintainer's checkout of this repo runs `maintainer/hooks/pre-push`, which runs `maintainer/prepush.py hook`: it scans the commits the push sends (each commit message, and the name and contents of each file a commit adds or changes) against the `.export-deny` of the maintainer's own Log, as the export scans (whole words, case-insensitive), and refuses the push on a hit, naming the commit and the line, never the list. It fails closed: with no path configured, no file there, an empty list or no Python 3.11+, the push is refused. The path lives in this checkout's git config, never in a tracked file, and the list never enters this repo. It is the maintainer's guard only: an outside contributor has no such list and does not install the hook.
 
-Set it up once per checkout of this repo (worktrees share the checkout's config, so its worktrees are covered too):
+Set it up once, in the main checkout of this repo, on the default branch; its worktrees share its config, so they are covered too:
 
-1. Point git at the repo's hooks. macOS and Windows PowerShell, in the checkout:
+1. Point git at the main checkout's hooks, by their absolute path: a relative path is read in each worktree, and one whose branch has no hook (`coord`, or a branch made before the hook) would push unchecked. macOS and Windows PowerShell, in the main checkout:
 
    ```sh
-   git config core.hooksPath maintainer/hooks
+   git config core.hooksPath "$(git rev-parse --show-toplevel)/maintainer/hooks"
    ```
 
-   Check: `git config --get core.hooksPath` prints `maintainer/hooks`. On macOS, also `ls -l maintainer/hooks/pre-push` shows it executable (`x`); git checks it out so.
+   Check: `git config --get core.hooksPath` prints that absolute path, ending in `/maintainer/hooks`. On macOS, also `ls -l maintainer/hooks/pre-push` shows it executable (`x`); git checks it out so. Windows needs no executable bit.
 2. Name the deny list: the `.export-deny` at the root of the maintainer's Log checkout. macOS and Windows PowerShell: `git config careerlog.denylist <Log checkout>/.export-deny`, with the Log checkout's full path (forward slashes work on Windows; a leading `~` is expanded).
    Check: `git config --get careerlog.denylist` prints that path.
 3. Confirm the hook is active. macOS: `python3 -I maintainer/prepush.py check`; Windows PowerShell: `py -3 -I maintainer/prepush.py check`.
    Check: it prints `OK: the pre-push hook is active; it scans against <n> patterns in <path>`, and `git push --dry-run origin HEAD` prints `OK: no name from the deny list in the commits this push sends` (the hook runs on a dry run too; with nothing to send it prints the same line).
 
-On a `FAIL:` from the hook, take the name out of the commits it lists (amend the last commit, or rewrite the branch's unpushed commits) and push again; a name already pushed is published, so tell the user. To scan a range by hand: `python3 -I maintainer/prepush.py scan --deny <path> origin/master..HEAD` (Windows: `py -3 -I ...`). Never skip it with `git push --no-verify`.
+On a `FAIL:` from the hook, take the name out of the commits it lists (amend the last commit, or rewrite the branch's unpushed commits) and push again; a name already pushed is published, so tell the user. To scan a range by hand: macOS `python3 -I maintainer/prepush.py scan --deny <path> origin/master..HEAD`, Windows PowerShell `py -3 -I maintainer/prepush.py scan --deny <path> origin/master..HEAD`. Never skip it with `git push --no-verify`.
 
 ## Rules
 
