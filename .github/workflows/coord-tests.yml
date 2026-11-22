@@ -1,5 +1,6 @@
 # Runs the tests of the maintainer's coordination tools (maintainer/coord.py: blocked-by marks and a
-# Template release's staging; .github/workflows/closing_refs.py's check).
+# Template release's staging; .github/workflows/closing_refs.py's check; maintainer/prepush.py, the
+# pre-push check against the deny list).
 # Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11). Its Windows code
 # (Git for Windows' sh) is left to the session that changes it, which runs these tests on the
 # maintainer's own machine (SETUP.md step 7): Windows took four minutes here, billed twice (the
@@ -13,6 +14,9 @@ on:
       - "maintainer/coord.py"
       - "maintainer/tests/test_coord.py"
       - "maintainer/tests/test_closing_refs.py"
+      - "maintainer/prepush.py"
+      - "maintainer/hooks/pre-push"
+      - "maintainer/tests/test_prepush.py"
       - "tools/export-template.sh"
       - ".github/workflows/closing_refs.py"
       - "tools/deny_coverage.py"
@@ -39,3 +43,5 @@ jobs:
         run: python -I maintainer/tests/test_coord.py -v
       - name: Run maintainer/tests/test_closing_refs.py
         run: python -I maintainer/tests/test_closing_refs.py -v
+      - name: Run maintainer/tests/test_prepush.py
+        run: python -I maintainer/tests/test_prepush.py -v
