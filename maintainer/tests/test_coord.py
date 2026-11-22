@@ -4,7 +4,7 @@ local bare repository as the template remote) for publish; nothing reaches GitHu
 
   python3 -I maintainer/tests/test_coord.py
 """
-import importlib.util, io, json, os, re, shutil, subprocess, tempfile, unittest
+import ast, importlib.util, io, json, os, re, shutil, subprocess, tempfile, unittest
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -186,7 +186,7 @@ class Publish(Temp):
         self.assertEqual(read(os.path.join(tpl, "tools", "TEMPLATE_VERSION")).splitlines()[0], "9.9.9")
         sha = git(self.src, "rev-parse", "HEAD")
         self.assertEqual(read(os.path.join(self.scratch, "commit-message.txt")),
-                         "Release 9.9.9: a summary\n\nExported from career-log %s\n" % sha)
+                         "Release 9.9.9: a summary\n\nExported from career-log-engine %s\n" % sha)
         self.assertEqual(git(tpl, "log", "--format=%s"), "Release 0.1.0")   # nothing committed
         want = sorted(l.split("\t")[1] for l in git(self.src, "ls-tree", "-r", "HEAD").splitlines()
                       if l.startswith("100755") and not l.split("\t")[1].startswith("maintainer/"))
@@ -250,6 +250,65 @@ class Publish(Temp):
         self.assertEqual(rc, 1)
         self.assertIn("takes a semver", out)
         self.assertFalse(os.path.exists(os.path.join(self.scratch, "tpl")))
+
+
+class OneExportRunner(unittest.TestCase):
+    """#18: coord.export runs tools/export-template.sh --version for every maintainer tool, and
+    coord.exported_from writes the line naming the source repo; a copy of either outside coord fails.
+    (harness.py runs the export too, by the script's full path, with no version: a test copy, not a
+    release or a Dev build, so the scan does not match it.)"""
+
+    RUNNER = ("coord.py", "export")
+    LINE = ("coord.py", "exported_from")
+
+    def scan(self, name, source):
+        """[(line, what, owner)] for each string, docstrings aside, that names the export script or the
+        source repo, owner the function it is in (None at module level)."""
+        hits = []
+        tree = ast.parse(source, name)
+        docs = {id(n.body[0].value) for n in ast.walk(tree)
+                if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and n.body and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
+
+        def walk(node, owner):
+            for child in ast.iter_child_nodes(node):
+                inner = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else owner
+                if isinstance(child, ast.Constant) and isinstance(child.value, str) and id(child) not in docs:
+                    if child.value == "tools/export-template.sh":
+                        hits.append((child.lineno, "runner", owner))
+                    elif "Exported from" in child.value or "career-log-engine" in child.value:
+                        hits.append((child.lineno, "line", owner))
+                walk(child, inner)
+
+        walk(tree, None)
+        return hits
+
+    def copies(self, name, source):
+        allowed = {"runner": self.RUNNER, "line": self.LINE}
+        return ["%s:%d: %s outside coord.%s; call coord.%s instead" % (name, line, what, allowed[what][1],
+                                                                       allowed[what][1])
+                for line, what, owner in self.scan(name, source)
+                if (name, owner) != allowed[what] and not (name == "coord.py" and owner is None)]
+
+    def test_no_maintainer_tool_runs_the_export_or_writes_the_line_by_hand(self):
+        found = []
+        folder = os.path.join(HERE, "..")
+        for name in sorted(os.listdir(folder)):
+            if name.endswith(".py"):
+                found += self.copies(name, read(os.path.join(folder, name)))
+        self.assertEqual(found, [])
+
+    def test_the_guard_reads_each_copy(self):
+        copied = ('def export(root, version, out):\n'
+                  '    subprocess.run([sh, "tools/export-template.sh", "--version", version, out])\n'
+                  'def build():\n'
+                  '    message = "Dev build\\n\\nExported from career-log-engine %s\\n" % source\n'
+                  '    tag = "career-log-engine %s" % source\n')
+        self.assertEqual([l.split(":")[1] for l in self.copies("devbuild.py", copied)], ["2", "4", "5"])
+
+    def test_the_line_names_this_repo(self):
+        self.assertEqual(coord.SOURCE_REPO, "career-log-engine")
+        self.assertEqual(coord.exported_from("abc"), "Exported from career-log-engine abc")
 
 
 if __name__ == "__main__":

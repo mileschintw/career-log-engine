@@ -22,7 +22,7 @@ Placeholders: `<root>` is the Log's root, `<py>` is `python3` (`py -3` on Window
    git -C <root> ls-remote --tags https://github.com/mileschintw/career-log-engine.git "v*-dev.*"
    git -C <root> fetch --no-tags https://github.com/mileschintw/career-log-engine.git "+refs/tags/v*:refs/career-log-upgrade/engine/v*"
    ```
-   The ref is then `refs/career-log-upgrade/engine/v<that version>`. When `<url>` is not the default, it holds every tag: list and fetch from `<url>` instead, and the ref is `refs/career-log-upgrade/v<that version>`.
+   The ref is then `refs/career-log-upgrade/engine/v<that version>`. When `<url>` is not the default, it holds every tag: list and fetch from `<url>` instead, and the ref is `refs/career-log-upgrade/v<that version>`. A **local Dev build** (the user names a Dev build and a folder on this machine, a build of a change not yet merged) is such a `<url>`: the folder's path, which holds the release tags too.
 3. Take the target's tool and this mode's file as the target has them, into `<root>/.build/upgrade/` (`.gitignore` leaves `.build/` out); this writes those two files there and leaves the Log's index and working tree as they are:
    ```
    mkdir -p <root>/.build/upgrade

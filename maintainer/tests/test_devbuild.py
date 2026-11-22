@@ -5,7 +5,7 @@ nothing reaches GitHub.
 
   python3 -I maintainer/tests/test_devbuild.py
 """
-import filecmp, importlib.util, io, os, shutil, subprocess, tarfile, tempfile, unittest, unittest.mock
+import filecmp, importlib.util, io, os, shutil, subprocess, sys, tarfile, tempfile, unittest, unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -107,6 +107,11 @@ class Build(unittest.TestCase):
         self.assertEqual(git(self.dest, "rev-parse", "v0.4.1-dev.2^{commit}"), git(self.dest, "rev-parse", "builds"))
         self.assertEqual(git(self.dest, "rev-parse", "builds^"), first)
         self.assertEqual(git(self.dest, "cat-file", "-t", "v0.4.1-dev.2"), "tag")   # annotated: --follow-tags
+        source = git(self.src, "rev-parse", "HEAD")
+        self.assertEqual(git(self.dest, "log", "-1", "--format=%B", "builds"),
+                         "Dev build 0.4.1-dev.2\n\nExported from career-log-engine %s" % source)
+        self.assertEqual(git(self.dest, "tag", "-l", "--format=%(contents)", "v0.4.1-dev.2"),
+                         "Dev build 0.4.1-dev.2 of career-log-engine %s" % source)
         git(self.dest, "tag", "v0.4.1")   # a release in dest counts too, and <n> starts over
         rc, out, err = self.build()
         self.assertEqual(rc, 0, out + err)
@@ -143,6 +148,18 @@ class Build(unittest.TestCase):
         p = subprocess.run(["git", "-C", self.dest, "merge-base", "builds", "master"], capture_output=True)
         self.assertEqual(p.returncode, 1)   # no common history
         self.assertEqual(git(self.dest, "rev-list", "--count", "builds"), "1")
+        # and the release tags, as the releases repo has them, for an upgrade from <dest> (#19)
+        self.assertEqual(git(self.dest, "tag", "-l").split(), ["v0.3.9", "v0.4.0", "v0.4.1-dev.1"])
+        self.assertEqual(git(self.dest, "rev-parse", "v0.4.0"), git(self.rel, "rev-parse", "v0.4.0"))
+
+    def test_keeps_a_release_tag_dest_has(self):
+        git(self.dest, "tag", "v0.4.0")   # dest's own v0.4.0, another commit than the releases repo's
+        git(self.rel, "commit", "-q", "--allow-empty", "-m", "second")
+        git(self.rel, "tag", "-f", "v0.4.0")
+        rc, out, err = self.build()
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(git(self.dest, "rev-parse", "v0.4.0"), git(self.dest, "rev-parse", "master"))
+        self.assertEqual(git(self.dest, "rev-parse", "v0.3.9"), git(self.rel, "rev-parse", "v0.3.9"))
 
     def test_builds_while_the_guide_holds_a_change(self):
         self.guide_change()
@@ -173,7 +190,7 @@ class Build(unittest.TestCase):
         identity(self.dest)
         rc, out, err = self.build()
         self.assertEqual(rc, 0, out + err)
-        self.assertEqual(git(self.dest, "tag", "-l"), "v0.4.1-dev.1")
+        self.assertEqual(git(self.dest, "tag", "-l").split(), ["v0.3.9", "v0.4.0", "v0.4.1-dev.1"])
 
     def test_refusals(self):
         git(self.rel, "tag", "-d", "v0.4.0")
@@ -193,6 +210,92 @@ class Build(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("not the top", err)
         self.assertEqual(git(self.dest, "tag", "-l"), "")
+
+
+@unittest.skipUnless(shutil.which("sh") or os.name == "nt", "no sh to run tools/export-template.sh")
+class UpgradeToALocalBuild(unittest.TestCase):
+    """#19: a Dev build made into an empty folder is a --url the upgrade tool takes, for a Log on the
+    latest release and for a Log on an earlier Dev build of the same version. The releases repo holds a
+    real release, v0.4.0, the export of the source as it was; the Log is made from it."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.global_config = os.path.join(self.tmp, "gitconfig")
+        with open(self.global_config, "w", encoding="utf-8") as f:
+            f.write("[user]\n\tuseConfigOnly = true\n[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n"
+                    "[core]\n\tautocrlf = false\n")
+        # the identity <dest> gets nowhere else: it is an empty folder before the build
+        who = {"GIT_%s_%s" % (r, k): v for r in ("AUTHOR", "COMMITTER")
+               for k, v in (("NAME", "Test"), ("EMAIL", "test@example.com"))}
+        self.env = unittest.mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": self.global_config, **who})
+        self.env.start()
+        self.src, self.dest, self.rel, self.log = (os.path.join(self.tmp, n) for n in ("src", "dest", "rel", "log"))
+        git(self.tmp, "clone", "-q", REPO, self.src)
+        up = os.path.join(self.src, "docs", "upgrades")
+        for ext in ("md", "py"):   # whatever upgrade-next.* holds now, start from an empty guide
+            shutil.copyfile(os.path.join(up, "upgrade-skeleton." + ext), os.path.join(up, "upgrade-next." + ext))
+        git(self.src, "commit", "-q", "--allow-empty", "-am", "an empty next guide")
+        # the release: the export of the source at 0.4.0, as the Template holds it
+        git(self.tmp, "init", "-q", "-b", "main", self.rel)
+        with redirect_stdout(io.StringIO()):
+            devbuild.export(self.src, "0.4.0", os.path.join(self.tmp, "release"))
+        shutil.copytree(os.path.join(self.tmp, "release"), self.rel, dirs_exist_ok=True)
+        git(self.rel, "add", "-A", "-f")
+        git(self.rel, "commit", "-q", "-m", "Release 0.4.0")
+        git(self.rel, "tag", "v0.4.0")
+        # the Log: a new repository with the release's files, as the Template's "Use this template" makes one
+        git(self.tmp, "init", "-q", "-b", "main", self.log)
+        tar = os.path.join(self.tmp, "release.tar")
+        git(self.rel, "archive", "-o", tar, "v0.4.0")
+        with tarfile.open(tar) as t:
+            t.extractall(self.log, **({"filter": "tar"} if hasattr(tarfile, "tar_filter") else {}))
+        git(self.log, "add", "-A")
+        git(self.log, "commit", "-q", "-m", "Initial commit")
+        self.tool = os.path.join(self.src, "tools", "upgrade.py")
+
+    def tearDown(self):
+        self.env.stop()
+        rmtree(self.tmp)
+
+    def change_and_build(self, text):
+        """A commit to the source's AGENTS.md, then its Dev build into dest; the build's version."""
+        with open(os.path.join(self.src, "AGENTS.md"), "a", encoding="utf-8", newline="\n") as f:
+            f.write("\n%s\n" % text)
+        git(self.src, "commit", "-q", "-am", text)
+        rc, out, err = run(self.dest, "--root", self.src, "--releases", self.rel)
+        self.assertEqual(rc, 0, out + err)
+        return out.split("dev build: v", 1)[1].split()[0]
+
+    def upgrade(self, version):
+        """plan --to <version> --url <dest>, then engine and a commit, as the upgrade mode runs them."""
+        def tool(*args):
+            p = subprocess.run([sys.executable, "-I", self.tool, *args], capture_output=True, encoding="utf-8")
+            return p.returncode, p.stdout.splitlines()
+        rc, out = tool("plan", self.log, "--to", version, "--url", self.dest)
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out[1], "to: " + version)
+        self.assertEqual([l for l in out if l.startswith("step: ")], ["step: " + version])
+        rc, out = tool("engine", self.log, version)
+        self.assertEqual(rc, 0, out)
+        git(self.log, "add", "-A")
+        git(self.log, "commit", "-q", "-m", "upgrade: Template " + version)
+        with open(os.path.join(self.log, "tools", "TEMPLATE_VERSION"), encoding="utf-8") as f:
+            self.assertEqual(f.readline().strip(), version)
+
+    def agents(self):
+        with open(os.path.join(self.log, "AGENTS.md"), encoding="utf-8") as f:
+            return f.read()
+
+    def test_from_the_release_then_from_an_earlier_dev_build(self):
+        os.makedirs(self.dest)   # an empty folder
+        first = self.change_and_build("first change")
+        self.assertEqual(first, "0.4.1-dev.1")
+        self.upgrade(first)   # the Log on the latest release
+        self.assertIn("first change", self.agents())
+        second = self.change_and_build("second change")
+        self.assertEqual(second, "0.4.1-dev.2")
+        self.upgrade(second)   # the Log on an earlier Dev build of the same version
+        self.assertIn("second change", self.agents())
 
 
 def got_files(root):

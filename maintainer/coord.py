@@ -30,6 +30,8 @@ import argparse, json, os, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_URL = "https://github.com/mileschintw/career-log-template"
+# The repo an export is made from, as a release's and a Dev build's messages name it (ADR 0015)
+SOURCE_REPO = "career-log-engine"
 
 
 class Fail(Exception):
@@ -143,6 +145,23 @@ def cmd_block(a, run):
 
 # --- publish --------------------------------------------------------------------------------------
 
+def exported_from(source):
+    """The line a release's commit message and a Dev build's end with."""
+    return "Exported from %s %s" % (SOURCE_REPO, source)
+
+
+def export(root, version, out):
+    """Run tools/export-template.sh --version <version> <out> from root, passing its output on: for
+    publish here and for devbuild.py."""
+    sh, extra = find_sh()
+    env = dict(os.environ, PATH=extra + os.pathsep + os.environ.get("PATH", "")) if extra else None
+    p = subprocess.run([sh, "tools/export-template.sh", "--version", version, out], cwd=root, env=env,
+                       capture_output=True, encoding="utf-8", errors="replace")
+    sys.stdout.write(p.stdout)
+    if p.returncode != 0:
+        raise Fail("tools/export-template.sh failed (exit %d): %s" % (p.returncode, (p.stderr or "").strip()))
+
+
 def index_modes(repo, *args):
     """{path: mode} from `git ls-files -s` (args empty) or `git ls-tree -r <commit>`."""
     out = git(repo, *(args or ("ls-files", "-s"))).splitlines()
@@ -177,15 +196,10 @@ def cmd_publish(a):
     scratch = os.path.abspath(a.scratch)
     if os.path.exists(scratch) and os.listdir(scratch):
         raise Fail("%s exists and is not empty" % scratch)
-    sh, extra = find_sh()
+    find_sh()   # no sh: stop before the scratch folder is made
     os.makedirs(scratch, exist_ok=True)
-    export, tpl = os.path.join(scratch, "export"), os.path.join(scratch, "tpl")
-    env = dict(os.environ, PATH=extra + os.pathsep + os.environ.get("PATH", "")) if extra else None
-    p = subprocess.run([sh, "tools/export-template.sh", "--version", a.version, export],
-                       cwd=a.root, env=env, capture_output=True, encoding="utf-8", errors="replace")
-    sys.stdout.write(p.stdout)
-    if p.returncode != 0:
-        raise Fail("tools/export-template.sh failed (exit %d): %s" % (p.returncode, (p.stderr or "").strip()))
+    out, tpl = os.path.join(scratch, "export"), os.path.join(scratch, "tpl")
+    export(a.root, a.version, out)
     p = subprocess.run(["git", "clone", "-q", a.url, tpl], capture_output=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise Fail("git clone %s failed: %s" % (a.url, p.stderr.strip()))
@@ -193,7 +207,7 @@ def cmd_publish(a):
         if name != ".git":
             path = os.path.join(tpl, name)
             shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.remove(path)
-    shutil.copytree(export, tpl, dirs_exist_ok=True, symlinks=True)
+    shutil.copytree(out, tpl, dirs_exist_ok=True, symlinks=True)
     git(tpl, "add", "-A")
     lines = read(os.path.join(tpl, "tools", "TEMPLATE_VERSION")).splitlines()
     if not lines or lines[0].strip() != a.version:
@@ -203,7 +217,7 @@ def cmd_publish(a):
         raise Fail("tpl/tools/TEMPLATE_VERSION names no source commit")
     executable = set_modes(a.root, source, tpl)
     message = os.path.join(scratch, "commit-message.txt")
-    write_text(message, "Release %s: %s\n\nExported from career-log %s\n" % (a.version, a.summary, source))
+    write_text(message, "Release %s: %s\n\n%s\n" % (a.version, a.summary, exported_from(source)))
     print(git(tpl, "diff", "--cached", "--stat") or "(no change staged)")
     print("executable (100755): %s" % (", ".join(executable) or "none"))
     guide = sorted("docs/upgrades/" + n for n in os.listdir(os.path.join(tpl, "docs", "upgrades"))
