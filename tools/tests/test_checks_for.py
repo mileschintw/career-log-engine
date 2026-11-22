@@ -17,7 +17,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 REPO = os.path.dirname(TOOLS)
 WORKFLOWS = os.path.join(REPO, ".github", "workflows")
-NO_PATHS = {"closing-refs.yml"}   # runs on every pull request with a closing keyword, not on paths
+# closing-refs.yml runs on every pull request with a closing keyword, not on paths; dev-build.yml on
+# each push to master, its test in coord-tests.yml
+NO_PATHS = {"closing-refs.yml", "dev-build.yml"}
 
 spec = importlib.util.spec_from_file_location("checks_for", os.path.join(TOOLS, "checks_for.py"))
 checks_for = importlib.util.module_from_spec(spec)

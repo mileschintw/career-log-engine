@@ -608,9 +608,46 @@ class Export(unittest.TestCase):
         self.assertIn("personal content: /allowlist/", out)
 
     def test_version_must_be_semver(self):
-        rc, out = self.export("--version", "0.x")
-        self.assertEqual(rc, 1)
-        self.assertIn("takes a semver", out)
+        for bad in ("0.x", "0.4.1-dev", "0.4.1-dev.0", "0.4.1-rc.1", "v0.4.1-dev.1"):
+            rc, out = self.export("--version", bad)
+            self.assertEqual(rc, 1, bad)
+            self.assertIn("takes a semver", out)
+
+    def next_guide(self, change):
+        """upgrade-next.* reset to the empty skeleton, with a Log format change in the .md when change."""
+        up = os.path.join(self.src, "docs", "upgrades")
+        for ext in ("md", "py"):
+            shutil.copyfile(os.path.join(up, "upgrade-skeleton." + ext), os.path.join(up, "upgrade-next." + ext))
+        if change:
+            p = os.path.join(up, "upgrade-next.md")
+            with open(p, encoding="utf-8") as f:
+                text = f.read()
+            with open(p, "w", encoding="utf-8", newline="\n") as f:
+                f.write(text.replace("No Log format change yet.", "- a format change, step 1"))
+        git(self.src, "commit", "-q", "--allow-empty", "-am", "the next guide")
+        with open(os.path.join(up, "upgrade-next.md"), "rb") as f:
+            return f.read()
+
+    def test_dev_build_ships_the_next_guide_as_it_stands(self):
+        # a Dev build is no release: a guide holding a change does not stop it, and it ships the guide
+        guide = self.next_guide(change=True)
+        rc, out = self.export("--version", "0.5.0-dev.12")
+        self.assertEqual(rc, 0, out)
+        with open(os.path.join(self.tmp, "out", "tools", "TEMPLATE_VERSION"), encoding="utf-8") as f:
+            self.assertEqual(f.read().splitlines()[0], "0.5.0-dev.12")
+        with open(os.path.join(self.tmp, "out", "docs", "upgrades", "upgrade-next.md"), "rb") as f:
+            self.assertEqual(f.read(), guide)
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "out", "docs", "upgrades", "upgrade-next.py")))
+        rc, out = self.export("--version", "0.5.0", dest="rel")   # a release is still refused
+        self.assertEqual(rc, 1, out)
+        self.assertIn("holds a Log format change or a new setting", out)
+
+    def test_release_ships_no_next_guide(self):
+        self.next_guide(change=False)
+        rc, out = self.export("--version", "0.4.1")
+        self.assertEqual(rc, 0, out)
+        names = os.listdir(os.path.join(self.tmp, "out", "docs", "upgrades"))
+        self.assertEqual([n for n in names if "next" in n or "skeleton" in n or n.startswith("test-")], [])
 
     def test_refuses_while_next_guide_holds_a_change(self):
         up = os.path.join(self.src, "docs", "upgrades")

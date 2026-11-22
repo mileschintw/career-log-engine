@@ -1,8 +1,10 @@
 #!/bin/sh
 # Build the shareable Template (Engine + empty Log skeleton) into a new folder.
-#   tools/export-template.sh [--version <semver>] <dest>
+#   tools/export-template.sh [--version <semver>[-dev.<n>]] <dest>
 # --version names the release this export is (ADR 0011); without it the export is
-# stamped `next`, a build no Log upgrades from or to.
+# stamped `next`, a build no Log upgrades from or to. A Dev build's version, <semver>-dev.<n>
+# (maintainer/devbuild.py), is a build towards the release not yet made: it ships the next guide
+# as it stands, where a release refuses one that holds a change.
 # Exports committed content only (git archive HEAD): the allowlist below, then the
 # skeleton in tools/template/ overlaid at the root. Anything not on the allowlist
 # (entries, sources, outputs, profile, direction, ...) never leaves, and neither do
@@ -14,12 +16,15 @@
 # scan reads tools/template/.export-deny, the list every Log starts with.
 set -eu
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
-USAGE="usage: tools/export-template.sh [--version <semver>] <dest>"
+USAGE="usage: tools/export-template.sh [--version <semver>[-dev.<n>]] <dest>"
 VERSION=next
+DEV=
 if [ "${1:-}" = "--version" ]; then
   VERSION=${2:?$USAGE}; shift 2
-  if ! printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
-    echo "refusing: --version takes a semver such as 0.2.0, not $VERSION"; exit 1
+  if printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+-dev\.[1-9][0-9]*'; then
+    DEV=1
+  elif ! printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+    echo "refusing: --version takes a semver such as 0.2.0, or a Dev build's such as 0.2.1-dev.1, not $VERSION"; exit 1
   fi
 fi
 DEST=${1:?$USAGE}
@@ -37,8 +42,8 @@ if [ -e "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ]; then
 fi
 # A release ships no unreleased guide: upgrade-next.* is renamed to the version first, unless it
 # still holds only the empty skeleton: no Log format change (`## Changes`, CHECKS) and no new
-# setting (`## 3. New settings`). Read from HEAD, the commit exported.
-if [ "$VERSION" != next ]; then
+# setting (`## 3. New settings`). Read from HEAD, the commit exported. A Dev build is no release.
+if [ "$VERSION" != next ] && [ -z "$DEV" ]; then
   NEXT_MD=$(git -C "$ROOT" show HEAD:docs/upgrades/upgrade-next.md 2>/dev/null || true)
   NEXT_PY=$(git -C "$ROOT" show HEAD:docs/upgrades/upgrade-next.py 2>/dev/null || true)
   if { [ -n "$NEXT_MD" ] && ! printf '%s\n' "$NEXT_MD" | tr -d '\r' | grep -qxF 'No Log format change yet.'; } ||
@@ -83,9 +88,10 @@ git -C "$ROOT" -c core.autocrlf=false archive --format=tar -o "$TMP/skeleton.tar
 tar xf "$TMP/engine.tar" -C "$OUT"
 tar xf "$TMP/skeleton.tar" -C "$OUT"
 # The maintainer's files in docs/upgrades/ stay here: the scratch Logs that test a guide
-# (test-*.sh), the guide of the release not yet made (upgrade-next.*) and its empty form
-# (upgrade-skeleton.*).
-rm -f "$OUT"/docs/upgrades/test-* "$OUT"/docs/upgrades/upgrade-next.* "$OUT"/docs/upgrades/upgrade-skeleton.*
+# (test-*.sh), the guide of the release not yet made (upgrade-next.*, which a Dev build ships as it
+# stands) and its empty form (upgrade-skeleton.*).
+rm -f "$OUT"/docs/upgrades/test-* "$OUT"/docs/upgrades/upgrade-skeleton.*
+if [ -z "$DEV" ]; then rm -f "$OUT"/docs/upgrades/upgrade-next.*; fi
 # Stamp the version and the commit exported: "Use this template" squashes the history, so this
 # file is how a Log names its Template version (the upgrade mode, the issue form, import-chats
 # step 8). Written before the scan, and only from the Template's own source: an export from a
