@@ -532,6 +532,30 @@ class Upgrade(unittest.TestCase):
         finally:
             upgrade.URL, upgrade.DEV_URL, upgrade.git = saved
 
+    def test_dev_tags_from_a_url_given_come_from_it_alone(self):
+        # a local Dev build is such a url: one folder holding the releases' tags and its Dev builds'.
+        # The Engine repo's address is never contacted, from a release or from a Dev build
+        self.dev_builds()
+        log, dev_log = self.log("0.3.1"), self.log("0.3.2-dev.1", name="dev-log")
+        calls = []
+        real_git = upgrade.git
+
+        def recording(root, *args, **kw):
+            calls.append(args)
+            return real_git(root, *args, **kw)
+
+        saved = upgrade.DEV_URL, upgrade.git
+        upgrade.DEV_URL, upgrade.git = "file:///nowhere/engine.git", recording
+        try:
+            for one, to in ((log, "0.3.2-dev.1"), (dev_log, "0.3.2-dev.2")):
+                calls.clear()
+                rc, out = upgrade.plan(one, to, self.url)
+                self.assertEqual(rc, 0, out)
+                self.assertEqual(out[1], "to: " + to)
+                self.assertEqual([a[a.index("--quiet") + 1] for a in calls if a[0] == "fetch"], [self.url])
+        finally:
+            upgrade.DEV_URL, upgrade.git = saved
+
     def test_dev_refusals(self):
         self.dev_builds()
         log = self.log("0.3.2-dev.2")
