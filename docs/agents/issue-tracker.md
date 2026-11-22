@@ -1,6 +1,6 @@
 # Issue tracker
 
-This repo's issues are GitHub Issues on its GitHub repo (the `origin` remote), read and written with `gh`. In `gh api` paths, `{owner}/{repo}` stands for that repo: `gh` fills it in from the checkout. Quote such a path: unquoted, PowerShell splits it at the braces. Issues, their comments and pull request bodies are written in English, with no names, employers or projects from anyone's Log (this repo holds none).
+This repo's issues are GitHub Issues on its GitHub repo (the `origin` remote), read and written with `gh`. In `gh api` paths, `{owner}/{repo}` stands for that repo: `gh` fills it in from the checkout. Quote such a path: unquoted, PowerShell splits it at the braces. Issues, their comments and pull request bodies are written in English, with no names, employers or projects from anyone's Log.
 
 ## Conventions
 
