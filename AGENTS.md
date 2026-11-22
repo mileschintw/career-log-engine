@@ -3,7 +3,7 @@
 This repo is a personal career log (a Log, with its Engine; see [GLOSSARY.md](GLOSSARY.md)), managed through the `career-log` skill in `skills/career-log/`. Read `skills/career-log/SKILL.md`, the skill entry point (the modes are in `skills/career-log/modes/`), before creating or editing anything here; its rules (provenance, attribution, gaps) apply to every file.
 
 <!-- source-only -->
-Here, in the Engine repo (`career-log-engine`, the Template's source), there is no Log: no entries, profile, direction or applications to read, and nothing to log, consolidate or save. Here the skill's Engine-change rules apply; its modes, setup and `docs/guide.md`'s *For agents* are for a Log, so do not run them here. There are three repos ([ADR 0015](docs/adr/0015-the-engine-is-developed-in-its-own-public-repo.md)): this one, public, holds the Engine's source and the maintainer's files; the Template, `career-log-template`, public, is this repo's export and is never edited by hand; the maintainer's Log, `career-log`, is private, and an Engine change found while using it is made here. [docs/maintaining.md](docs/maintaining.md) says more.
+Here, in the Engine repo (`career-log-engine`, the Template's source), there is no Log: no entries, profile, direction or applications to read, and nothing to log, consolidate or save. Here the skill's Engine-change rules apply; its modes, setup and `docs/guide.md`'s *For agents* are for a Log, so do not run them here. There are three repos ([ADR 0015](docs/adr/0015-the-engine-is-developed-in-its-own-public-repo.md)): this one, public, holds the Engine's source and the maintainer's files; the Template, `career-log-template`, public, is this repo's export and is never edited by hand, and its issue forms and front page send its users' issues and pull requests here; the maintainer's Log, `career-log`, is private, and an Engine change found while using it is made here. [docs/maintaining.md](docs/maintaining.md) says more.
 <!-- /source-only -->
 
 Asked what this repo is or can do, where to start or what to do next ("introduce this repo and set me up"): read [docs/guide.md](docs/guide.md) and follow its *For agents*.
@@ -31,7 +31,7 @@ Here, this repo's CI in `.github/`, the maintainer docs the export leaves out (`
 An Engine change never goes straight to the default branch: first a branch, then an issue, then a pull request. Before its first edit, read [skills/career-log/engine-changes.md](skills/career-log/engine-changes.md): the steps, their exceptions, the checks to run, and keeping Engine files free of personal content.
 
 <!-- source-only -->
-Here, in the Template's source, read [docs/publishing.md](docs/publishing.md) before you publish a release, take back an upstream pull request or issue, edit the Template's front page (`tools/template/README*.md`), or write Engine text only this repo's maintainer needs (a source-only block), and when the export fails (its scan, here against `tools/template/.export-deny`) or a CI run fails.
+Here, in the Template's source, read [docs/publishing.md](docs/publishing.md) before you publish a release, take an issue or pull request from a Template user, edit the Template's front page (`tools/template/README*.md`), or write Engine text only this repo's maintainer needs (a source-only block), and when the export fails (its scan, here against `tools/template/.export-deny`) or a CI run fails.
 <!-- /source-only -->
 
 <!-- source-only -->

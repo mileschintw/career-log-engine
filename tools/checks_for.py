@@ -221,6 +221,12 @@ GROUPS = [
     ], [
         py("maintainer/tests/test_devbuild.py"),
     ]),
+    ("prepush", "coord-tests.yml", [
+        "maintainer/prepush.py", "maintainer/hooks/pre-push", "maintainer/tests/test_prepush.py",
+        "tools/deny_coverage.py",
+    ], [
+        py("maintainer/tests/test_prepush.py"),
+    ]),
     ("closing refs", "coord-tests.yml", [
         ".github/workflows/closing_refs.py", "maintainer/tests/test_closing_refs.py",
     ], [
