@@ -21,7 +21,8 @@ else its patch (docs/publishing.md › Publishing a release). <n> is one more th
 v<next>-dev.<n> tag in <dest>, 1 when there is none, so it starts at 1 after each release. The export
 runs with --version <next>-dev.<n>, which does not refuse a next guide that holds a change and ships
 it as it stands. The build's tree is the export as it is, its file modes from the source commit. It
-writes only the builds branch and the tag in <dest>: never its checked-out branch or work tree.
+writes only the builds branch and the tag in <dest>: never its checked-out branch or work tree. The
+build's commit and tag carry <dest>'s git identity (user.name, user.email); with none, it stops first.
 Prints `dev build: v<version>`, its commit and its source, and the push command when --push is not
 given. Exit 0 when done, 1 when a check fails (the reason on stderr), 2 on a usage error.
 Standard library only, Python 3.11+.
@@ -130,6 +131,10 @@ def build(a):
     ref = "refs/heads/" + a.branch
     if git(dest, "symbolic-ref", "-q", "HEAD", check=False) == ref:
         raise Fail("%s has %s checked out; a Dev build never writes the checked-out branch" % (dest, a.branch))
+    for who in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):   # the build's commit and tag are made in dest
+        if subprocess.run(["git", "-C", dest, "var", who], capture_output=True).returncode != 0:
+            raise Fail("no git identity in %s for the build's commit and tag: set user.name and user.email "
+                       "(git -C %s config user.name ...), as dev-build.yml does" % (dest, dest))
     source = git(root, "rev-parse", "HEAD")
     dest_tags = git(dest, "tag", "-l").splitlines()
     releases = release_tags(dest_tags) + release_tags(remote_tags(a.releases))

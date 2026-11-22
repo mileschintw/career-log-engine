@@ -5,7 +5,7 @@ nothing reaches GitHub.
 
   python3 -I maintainer/tests/test_devbuild.py
 """
-import filecmp, importlib.util, io, os, shutil, subprocess, tarfile, tempfile, unittest
+import filecmp, importlib.util, io, os, shutil, subprocess, tarfile, tempfile, unittest, unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -58,6 +58,13 @@ class Build(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
+        # a global git config of the test's own, as on a CI runner: no identity but what a repo sets,
+        # here or in the new <dest>'s case below
+        self.global_config = os.path.join(self.tmp, "gitconfig")
+        with open(self.global_config, "w", encoding="utf-8") as f:
+            f.write("[user]\n\tuseConfigOnly = true\n")
+        self.env = unittest.mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": self.global_config})
+        self.env.start()
         self.src, self.dest, self.rel = (os.path.join(self.tmp, n) for n in ("src", "dest", "rel"))
         git(self.tmp, "clone", "-q", REPO, self.src)
         identity(self.src)
@@ -73,6 +80,7 @@ class Build(unittest.TestCase):
         git(self.rel, "tag", "v0.3.9")
 
     def tearDown(self):
+        self.env.stop()
         rmtree(self.tmp)
 
     def build(self, *extra):
@@ -155,6 +163,12 @@ class Build(unittest.TestCase):
 
     def test_into_a_new_repo(self):
         self.dest = os.path.join(self.tmp, "new")
+        rc, out, err = self.build()   # a new repo has no identity of its own: stops before the export
+        self.assertEqual(rc, 1, out + err)
+        self.assertIn("no git identity", err)
+        self.assertEqual(out, "")
+        self.assertEqual(git(self.dest, "tag", "-l"), "")
+        identity(self.dest)
         rc, out, err = self.build()
         self.assertEqual(rc, 0, out + err)
         self.assertEqual(git(self.dest, "tag", "-l"), "v0.4.1-dev.1")
