@@ -10,13 +10,16 @@ its allow list (its .export-allow).
 
 scan   scans the commits `git rev-list <revision>...` lists (such as `origin/master..HEAD`): each
        commit's message, and the name and contents of each file it adds or changes against its first
-       parent (each file at that commit). Annotated tags a revision names (not after --not or a ^)
-       have their message scanned too. Each deny-list line is an extended regex matched as the export
-       matches it (tools/export-template.sh: whole words, case-insensitive; tools/deny_coverage.py
-       reads it). With --allow, the allow list's strings are first taken out of each line scanned
-       (contents, file names, messages): fixed strings, one per line, trimmed, `#` comments and
-       blank lines skipped, matched ignoring case, as the export masked them before this repo
-       began (such as this repo's and the Template's public addresses, which hold the owner's name).
+       parent (each file at that commit), except the contents of a file named exactly `LICENSE` in
+       any folder, which names the copyright holder on purpose (the export's scan leaves it out too:
+       `grep --exclude=LICENSE`); its name is still scanned. Annotated tags a revision names (not
+       after --not or a ^) have their message scanned too. Each deny-list line is an extended regex
+       matched as the export matches it (tools/export-template.sh: whole words, case-insensitive;
+       tools/deny_coverage.py reads it). With --allow, the allow list's strings are first taken out
+       of each line scanned (contents, file names, messages): fixed strings, one per line, trimmed,
+       `#` comments and blank lines skipped, matched ignoring case, as the export masked them before
+       this repo began (such as this repo's and the Template's public addresses, which hold the
+       owner's name).
 hook   what maintainer/hooks/pre-push runs: reads git's `<local ref> <local sha> <remote ref>
        <remote sha>` lines and scans, for each ref pushed, the commits the remote does not have yet
        (a new branch: those no ref of <remote> reaches; a deleted ref: nothing). The deny list is
@@ -44,6 +47,7 @@ import deny_coverage   # noqa: E402  (the export's whole-word, case-insensitive 
 CONFIG_KEY = "careerlog.denylist"
 ALLOW_KEY = "careerlog.allowlist"
 HOOKS_PATH = "maintainer/hooks"
+LICENCE = "LICENSE"   # names the copyright holder on purpose: contents not scanned (export: grep --exclude)
 USAGE = ("usage: prepush.py scan --deny <file> [--allow <file>] <revision>... | prepush.py hook <remote> [<url>]"
          " | prepush.py check")
 
@@ -173,7 +177,9 @@ def scan(lists, revisions):
         for path, _ in files:
             if lists.hits("./" + path):   # the path as the export's `find .` prints it
                 found.append("%s: file name %s" % (where, path))
-        new = [(path, oid) for path, oid in files if oid not in seen]
+        # A licence left out before `seen`, so the same contents in any other file are still read
+        new = [(path, oid) for path, oid in files
+               if oid not in seen and path.rsplit("/", 1)[-1] != LICENCE]
         seen.update(oid for _, oid in new)
         contents = blobs([oid for _, oid in new]) if new else {}
         for path, oid in new:
