@@ -15,6 +15,9 @@ with each line. Without --apply it only reads and prints. Each line starts with 
 
 Each check in CHECKS is a function (log root, apply) returning (kind, text) pairs; a pull request
 that changes a Log format adds its check here and its step to the guide.
+Each check can run again: on a Log already migrated it returns no apply, migrate, ask or done
+line and changes nothing, so it reads what is left from the data (an answered ask included),
+never from a past run; tools/tests/test_upgrade.py runs this script twice to check it.
 
 Exit 0 with `OK: nothing left to migrate` when no apply, migrate or ask line is left, 1 otherwise,
 2 on a bad argument. Standard library only, Python 3.11+.
