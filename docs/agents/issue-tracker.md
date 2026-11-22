@@ -1,6 +1,6 @@
 # Issue tracker
 
-This repo's issues are GitHub Issues on its GitHub repo (the `origin` remote), read and written with `gh`. In `gh api` paths, `{owner}/{repo}` stands for that repo: `gh` fills it in from the checkout. Quote such a path: unquoted, PowerShell splits it at the braces. Issues, their comments and pull request bodies are written in English, with no names, employers or projects from this Log.
+This repo's issues are GitHub Issues on its GitHub repo (the `origin` remote), read and written with `gh`. In `gh api` paths, `{owner}/{repo}` stands for that repo: `gh` fills it in from the checkout. Quote such a path: unquoted, PowerShell splits it at the braces. Issues, their comments and pull request bodies are written in English, with no names, employers or projects from anyone's Log (this repo holds none).
 
 ## Conventions
 
@@ -14,9 +14,9 @@ This repo's issues are GitHub Issues on its GitHub repo (the `origin` remote), r
 
 ## Pull requests as a triage surface
 
-**PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
+**PRs as a request surface: yes.** _(`/triage` reads this flag.)_ The Template's front page asks its users to send pull requests here, and [publishing.md](../publishing.md) triages them from `needs-triage` like an issue.
 
-When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
+PRs run through the same labels and states as issues, using the `gh pr` equivalents:
 
 - **Read a PR**: `gh pr view <number> --comments` and `gh pr diff <number>` for the diff.
 - **List external PRs for triage**: `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open' --jq '.[] | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not) | {number, title, author: .user.login, author_association, labels: [.labels[].name]}'`.
