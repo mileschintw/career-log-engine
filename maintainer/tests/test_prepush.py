@@ -121,6 +121,36 @@ class Scan(Repo):
         self.assertEqual(rc, 1)
         self.assertIn("commit %s: a.md:1" % sha[:10], out)
 
+    def test_licence_contents_not_scanned(self):
+        """A file named LICENSE, in any folder, is left out of the contents scan, as the export's is."""
+        self.commit({"LICENSE": "Copyright (c) Acme\n", "tools/template/LICENSE": "Copyright Zork Labs\n"},
+                    "Add licences")
+        rc, out = self.scan()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("OK:", out)
+
+    def test_licence_exemption_is_by_exact_name_only(self):
+        """The same word elsewhere still refuses: another file (one holding the same contents too, or
+        named like a licence), a file name, a commit message."""
+        same = "Copyright (c) Acme\n"
+        sha = self.commit({"LICENSE": same, "COPY": same, "docs/LICENSE.md": "acme\n",
+                           "lower/license": "acme too\n", "acme/LICENSE": "fine\n"}, "Add files\n\nFor Acme.")
+        rc, out = self.scan()
+        self.assertEqual(rc, 1)
+        where = "commit %s: " % sha[:10]
+        for hit in ("COPY:1", "docs/LICENSE.md:1", "lower/license:1", "file name acme/LICENSE",
+                    "message line 3"):
+            self.assertIn(where + hit, out)
+        self.assertNotIn(where + "LICENSE:1", out)
+
+    def test_licence_blob_reused_later_is_scanned(self):
+        """A LICENSE's contents copied to another file in a later commit are scanned there."""
+        self.commit({"LICENSE": "Copyright (c) Acme\n"}, "Add licence")
+        sha = self.commit({"NOTICE": "Copyright (c) Acme\n"}, "Add notice")
+        rc, out = self.scan()
+        self.assertEqual(rc, 1)
+        self.assertIn("commit %s: NOTICE:1" % sha[:10], out)
+
     def test_clean_range_passes(self):
         self.commit({"a.md": "acmex, xacme and zorklabsx are other words\n", "b/c.md": "fine\n"}, "Add a")
         self.commit({}, "Empty")
@@ -317,6 +347,8 @@ class RealPush(Repo):
         self.assertIn("no deny list configured", out)
         git(self.repo, "config", prepush.CONFIG_KEY, self.deny)
         self.assertEqual(self.push("master")[0], 0)
+        self.commit({"LICENSE": "Copyright (c) ACME\n"}, "Add a licence")
+        self.assertEqual(self.push("master")[0], 0)   # a licence's contents are not scanned
         self.commit({"b.md": "ACME\n"}, "Add b")
         rc, out = self.push("master")
         self.assertNotEqual(rc, 0)
