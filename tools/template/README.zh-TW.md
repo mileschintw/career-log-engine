@@ -35,7 +35,7 @@
 
 條目索引只放在英文版 [README.md](README.md#entries)，你每記一筆，skill 就會更新它。
 
-## 上游
+## Engine repo
 
 這個 repo 是從 https://github.com/mileschintw/career-log-template 這個 Template 建立的，而 Template 是 Engine repo（https://github.com/mileschintw/career-log-engine）的匯出。聊天匯出格式改了或某個步驟壞了，請到 Engine repo 回報：開 [issue](https://github.com/mileschintw/career-log-engine/issues) 或發 pull request。每個修正都在那裡做，Template 不收。Issue 是公開的：只附欄位名稱和結構，絕不附你的記錄。import 模式會幫你草擬回報，貼出前會先問你（[import-chats.md](skills/career-log/modes/import-chats.md) 第 8 步）。
 
