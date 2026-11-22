@@ -11,7 +11,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 HOOKS = os.path.normpath(os.path.join(HERE, "..", "hooks"))
 ZERO = "0" * 40
 DENY = "# scratch deny list\nacme\nzork[^[:alnum:]]*labs\n"
-PATTERNS = ("zork[^[:alnum:]]*labs", "deny list:")   # the list's lines never show, nor a dump of them
+ALLOW = "# scratch allow list\n\n  github.com/Acme/career-log-engine  \nacme.example\n"
+URL = "https://GitHub.com/acme/career-log-engine"
+# Neither list's lines show, nor a dump of them
+PATTERNS = ("zork[^[:alnum:]]*labs", "deny list:", "github.com/acme")
 
 
 def load(name):
@@ -170,6 +173,32 @@ class Scan(Repo):
         self.assertEqual(rc, 1)
         self.assertIn("cannot be read as grep -E", out)
 
+    def allow(self, text=ALLOW):
+        path = os.path.join(self.tmp, "deny", ".export-allow")
+        write(path, text)
+        return path
+
+    def test_allowed_string_alone_passes(self):
+        """Masked in contents, file names and messages, ignoring case, as the export masked."""
+        self.commit({"a.md": "See %s and %s/issues.\n" % (URL, URL.upper()),
+                     "acme.example/x.md": "x\n"}, "Fix %s#2" % URL)
+        self.assertEqual(self.scan()[0], 1)   # without the allow list: refused
+        rc, out = self.run_main("scan", "--deny", self.deny, "--allow", self.allow(), "origin/master..HEAD")
+        self.assertEqual(rc, 0, out)
+
+    def test_deny_word_outside_an_allowed_string_still_refuses(self):
+        sha = self.commit({"a.md": "%s\nfine\n%s, for Acme\n" % (URL, URL)}, "Add a")
+        rc, out = self.run_main("scan", "--deny", self.deny, "--allow", self.allow(), "origin/master..HEAD")
+        self.assertEqual(rc, 1)
+        self.assertIn("commit %s: a.md:3" % sha[:10], out)
+        self.assertNotIn("a.md:1", out)
+
+    def test_missing_allow_list_refuses(self):
+        self.commit({"a.md": "x\n"}, "Add a")
+        rc, out = self.run_main("scan", "--deny", self.deny, "--allow", os.path.join(self.tmp, "nope"), "HEAD")
+        self.assertEqual(rc, 1)
+        self.assertIn("no allow list at", out)
+
     def test_usage(self):
         self.assertEqual(self.run_main("scan", "HEAD")[0], 2)
         self.assertEqual(self.run_main()[0], 2)
@@ -231,6 +260,20 @@ class Hook(Repo):
         self.commit({"a.md": "x\n"}, "Add a")
         self.assertEqual(self.run_main("hook", "origin", self.remote, stdin=self.line(remote_oid="2" * 40))[0], 0)
 
+    def test_allow_list_key(self):
+        self.configure()
+        self.commit({"a.md": URL + "\n"}, "Add a")
+        rc, out = self.run_main("hook", "origin", self.remote, stdin=self.line())
+        self.assertEqual(rc, 1)   # no allow-list key: nothing masked, still checked
+        allow = os.path.join(self.tmp, "deny", ".export-allow")
+        git(self.repo, "config", prepush.ALLOW_KEY, allow)
+        rc, out = self.run_main("hook", "origin", self.remote, stdin=self.line())
+        self.assertEqual(rc, 1)   # a key naming no file refuses
+        self.assertIn("no allow list at", out)
+        write(allow, ALLOW)
+        rc, out = self.run_main("hook", "origin", self.remote, stdin=self.line())
+        self.assertEqual(rc, 0, out)
+
     def test_malformed_line(self):
         self.configure()
         self.assertEqual(self.run_main("hook", "origin", self.remote, stdin="garbage\n")[0], 1)
@@ -247,6 +290,14 @@ class Hook(Repo):
         rc, out = self.run_main("check")
         self.assertEqual(rc, 0, out)
         self.assertIn("2 patterns", out)
+        self.assertIn("masking nothing", out)
+        allow = os.path.join(self.tmp, "deny", ".export-allow")
+        git(self.repo, "config", prepush.ALLOW_KEY, allow)
+        self.assertIn("no allow list at", self.run_main("check")[1])
+        write(allow, ALLOW)
+        rc, out = self.run_main("check")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("masking 2 strings", out)
 
 
 class RealPush(Repo):
