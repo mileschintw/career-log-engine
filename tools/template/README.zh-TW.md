@@ -43,7 +43,7 @@
 
 要把這個 Log 升到較新的 Template，請跟你的 agent 說「升級到最新的 Template」。upgrade 模式（[upgrade.md](skills/career-log/modes/upgrade.md)）會抓下那個版本、換掉 Engine（skill、`tools/` 和 Template 附的其他檔案）、跟你一起依序跑中間每個版本的升級指引（某個版本要改你記錄的格式，就在指引裡做，並先問你），每個版本的步驟各 commit 一次。它只從乾淨的 working tree 開始，在你對整個升級說好之前什麼都不 push；在那之前，你都可以讓 Log 回到升級開始前的那個 commit。每個版本改了什麼，寫在 Template 的 [Releases](https://github.com/mileschintw/career-log-template/releases) 頁面。
 
-兩個版本之間，Engine repo 會發布 **dev build**：它的 [`builds`](https://github.com/mileschintw/career-log-engine/tree/builds) 分支上的 tag `v<next version>-dev.<n>`。沒有任何一個保證穩定。
+兩個版本之間，Engine repo 會發布 **Dev build**：它的 [`builds`](https://github.com/mileschintw/career-log-engine/tree/builds) 分支上的 tag `v<next version>-dev.<n>`。沒有任何一個保證穩定。
 
 你改過的 Engine 檔會怎樣：
 

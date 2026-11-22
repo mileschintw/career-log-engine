@@ -14,7 +14,7 @@ The public Template is https://github.com/mileschintw/career-log-template. Issue
 
 These rules were set while CI ran in a private repo, where each job counted against the account's Actions minutes, rounded up to a whole minute, at twice the rate on Windows; they hold until a change relaxes them. A new group whose `paths:` mostly match a workflow's joins that workflow instead of starting its own. A job runs on Ubuntu only, on Python 3.11, unless the tool has code for Windows alone that runs on the user's machine (setup and its check, line endings, a shell's quoting, git on the user's Log); then the job also runs on Windows, on a current Python, at least the steps that test that code. The workflow's header comment says why it runs on Windows or not. A session runs the checks on its own platform anyway ([SETUP.md](../SETUP.md) step 7).
 
-A newer push to the same pull request cancels the older run, and a branch with no pull request runs none of them; this is why [engine-changes.md](../skills/career-log/engine-changes.md) opens the pull request only once the change is finished, since each push to an open pull request starts a run. Log data commits never trigger them. A failure is reported on the pull request.
+A newer push to the same pull request cancels the older run, and a branch with no pull request runs none of them; this is why [engine-changes.md](../skills/career-log/engine-changes.md) opens the pull request only once the change is finished, since each push to an open pull request starts a run. A failure is reported on the pull request.
 
 ## Publishing a release
 

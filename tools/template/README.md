@@ -46,7 +46,7 @@ This repo was created from the Template at https://github.com/mileschintw/career
 
 To upgrade this Log to a newer Template, ask your agent to "upgrade to the latest Template". The upgrade mode ([upgrade.md](skills/career-log/modes/upgrade.md)) fetches the release and replaces the Engine (the skill, `tools/` and the other files the Template ships), runs the upgrade guide of each release in between with you (a guide is where a release changes your records' format, with your yes), and commits each release's step. It starts only from a clean working tree and pushes nothing until you say yes to the whole upgrade; until then, you can take the Log back to the commit it started from. The Template's [Releases](https://github.com/mileschintw/career-log-template/releases) page says what each release changed.
 
-Between releases, the Engine repo publishes **dev builds**: tags `v<next version>-dev.<n>` on its [`builds`](https://github.com/mileschintw/career-log-engine/tree/builds) branch. None is promised stable.
+Between releases, the Engine repo publishes **Dev builds**: tags `v<next version>-dev.<n>` on its [`builds`](https://github.com/mileschintw/career-log-engine/tree/builds) branch. None is promised stable.
 
 What happens to Engine files you changed:
 
