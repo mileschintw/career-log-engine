@@ -1,0 +1,1820 @@
+#!/usr/bin/env python3
+"""The check every career-log trigger runs first (SKILL.md › Trigger check).
+
+  python3 -I tools/check.py <mode> [--session <key>] [--root <root>]     (Windows: py -3 -I tools/check.py <mode>)
+
+<mode> is a mode from SKILL.md's modes table (`setup` checks every optional tool), or `browser`:
+playwright-cli's lines alone, with `now` steps, for browser.md before a first open. <root> is the
+Log's root, by default the folder above this script's real path, a skill link resolved (the skill's
+start.py runs this script from there). The first line is `root: <root>`, the path every `<root>` in
+the skill stands for. Then one `<what>: <state>` line per thing checked, then `next:` lines, the agent's steps in order: a
+`next: when <moment>, first: <step>` line waits for that moment (`now`: before anything else), and
+`next: stop: ...` ends the mode. The last line is `next: go on with the mode` when nothing stops it now
+and no `next: now` step asks to run this check again (in setup: a tool missing, or a question about
+it): that line waits for the rerun.
+
+Checks run in the order of CHECKS. Each takes the Context and returns (lines, nexts, stop);
+`stop` ends the run after its lines are printed, for a state no later check can help with.
+A later check is one more function appended to CHECKS.
+
+Machine setup: TinyTeX (with poppler) is required, so setup installs it with no question.
+~/.career-log/machine.toml holds the user's yes or no per optional tool (playwright-cli, speech) on
+this machine, one `<tool> = true|false` line each, written by tools/setup.sh and tools/setup.ps1
+(speech's by `tools/speech.py setup`, which also sets it up: its offer gives the three ways to take a
+spoken answer and what each gives, #707); a
+leftover `tinytex` line from before TinyTeX was required is ignored. Whether a tool is installed is
+detected here on every run, never stored. Setup also records there where poppler came from
+(`poppler = "micromamba"` or `"own"`); the check tells that from the path of the pdftotext
+tools/resume.py picks, so the path wins when the two disagree.
+
+Missing machine pieces read as one clause ("the links in <dir> are broken and playwright-cli is
+missing"). playwright-cli's lines end with `playwright-cli files:`, whether git ignores what it writes
+in this checkout (PLAYWRIGHT_FILES), asking the user when it does not.
+
+Mode state (check_mode_state), lines the mode files read in place of their own checks: in every
+mode, `direction <item>: set|empty|unreadable (<why>)` per Direction item (tools/config.py show
+says what it holds); in setup, `front page: template|trimmed|edited|missing` (config.py's
+front_page_state), `eol: ok|wrong (...)` (SETUP.md step 2's check) and one `skill link <agent>:
+ok|missing|broken|elsewhere` line per row of SETUP.md step 4; in import, `gitignore inbox: ok|missing`, with
+a `next: now` step that adds and commits the lines; in scan, `scan window:`, window and
+scheduled_window in days; in interview, the `next:` step for a profile shown only to signed-in
+members, from interviewer_profiles.
+
+Unattended: with CAREER_LOG_UNATTENDED set (a scheduled run), a step that would install something or
+ask the user says setup is needed instead, since no one is there to answer a question.
+
+Session (ADR 0014): every mode's check (not `browser`) in a git repository prints `session: <key>`. At a session's first
+check, without --session, it makes a new key (logfiles.SESSIONS/<key>/) whose record holds the
+baseline: the hash of each uncommitted Log file it found, which is not this session's (tools/sync.py
+claim and commit refuse it until it is settled). A later check passes --session <key> and keeps it, as
+the first `mode start:` value is kept; a key whose record is gone gets it made again, with no baseline.
+
+Uncommitted Log changes: the Log's own files (LOG_PATHS) that git shows as changed or new are
+listed, so a session settles what an earlier one left before it writes anything; the `next:` line
+points at tools/sync.py's `status` and `settle` (with --session <key>). A file this session claimed
+prints as `log change (this session): <XY> <path>`. A file another session claimed (tools/sync.py
+claim, or a commit under its key) prints as `log change (session <key>): <XY> <path>`, with a `next:`
+line to leave it out of every settle and commit, and no question about that session: time never
+releases a claim, and no session is ever named as possibly ended. A baseline file no session claimed
+whose hash changed since this session's first check prints as `log change (still changing): <XY>
+<path>`: another session is still writing it, so it is kept out of the settle too. `done`'s `Not saved
+yet` counts only this session's files and those an earlier session left.
+
+This Log's git state, read only (tools/sync.py makes every change): `identity: ok (<email>)` or
+`identity: missing`, the repo-local user.email every commit needs (SETUP.md step 3); a missing one
+holds up only a step that commits. `default branch: <name>` from origin/HEAD, or `unknown` while
+that is unset, with the command that sets it. On the default branch, `ahead: <n>`, the commits on
+HEAD not on origin/<default> as of the last fetch (nothing is fetched), with no step of its own:
+a sync.py commit that pushes takes them along, and in a mode that commits nothing, Next up names
+`sync.py push`; on any other branch, `branch: <name> (not
+<default>)` in its place. With no origin remote: `default branch: none (no origin remote)`, and no
+ahead or pull line. A root that is not the top folder of a git repository prints `git: not a
+repository` in place of these lines.
+
+Pull: a run with no `next: stop:`, on a branch with an upstream, ends its steps with a `next: now`
+line to run tools/sync.py pull (another clone may have pushed); this script itself never pulls.
+
+Setup for this Log: config.toml at the Log root (tools/config.py) says setup has run. Without it every
+mode but setup stops and points to setup; with it, one `config <field>: <value>` line per Config field
+(an empty conversation_language prints what it means: the language the user writes in).
+
+Entry size: an `entry over threshold: <path> <n> tokens` line for each entry tools/entries.py
+estimates past its threshold (half of what one Read call returns), in every mode. It has no
+next: line: the modes say what to do with an entry that size.
+
+Newer Template release: an `update: v<x> available (you have v<y>): ...` line, saying what to do with
+it, when the public Template has a release newer than tools/TEMPLATE_VERSION's version, and
+nothing otherwise. It asks GitHub's Releases API, for the Template tools/upgrade.py fetches
+(CAREER_LOG_RELEASES_URL overrides the address), at most once a day, for 2 seconds at most,
+sending nothing from the Log, and keeps the answer in ~/.career-log/release.json; offline,
+rate-limited or slow, it says nothing. It never asks with `update_check = "off"` in
+config.toml, in an unattended run, or without a released version in TEMPLATE_VERSION (the
+Template's source, an export's `next`). It only tells: the upgrade mode upgrades.
+
+Session hygiene (SKILL.md › Next up): every mode but log also prints a `mode start: <sha>@<time>`
+line (HEAD and the time, for `done --since`; the mode keeps its first check's, as the line says) and a `next: now, first:` line telling the agent to
+suggest a fresh session when this session already ran another mode. The modes that do not count
+come from the flows table of docs/guide.md (tools/guide.py flows): a step whose session is `same`.
+
+  python3 -I tools/check.py done <mode> [--session <key>] [--since <sha>@<time>] [--for <mode>] [--no-posting] [--family <target>]
+
+(--root as above) prints the Next up block that ends <mode>, as English data lines the agent renders in the user's
+language (SKILL.md › Next up): a `Close-out` heading line; the count and subjects of the commits made since `mode
+start` (pulled ones, older, left out); a `Next:` line for each step that applies now, naming what it acts on, never
+the work just saved. The step comes from the flows table for this Log's state: consolidate again while an
+entry is `stub` or `imported` (naming them; the entry a consolidate finished is `consolidated` by then), import again
+while the Log has no entries, and import in place of a step that reads entries while the Log has none; a step whose
+work is done is skipped: import once there are entries, consolidate once no entry is `stub` or `imported`, stories
+once stories/ holds a Talking points file. A step that needs a target the Log cannot name gets no line except right
+after the mode that leaves one (fit after scan-results, write after fit; interview never); nor does a mode with no
+fixed next step, or one that ends its flow. After consolidate, also a `Next:` line naming `audit` for each Target
+version whose stale count (tools/application.py stale: its two lists added together) is 3 or more now and was
+below 3 at `mode start`, with its entries: it shows once, on the run that crosses 3. After write, for an
+application folder saved since `mode start` without archived.md, from the family and tier `application.py start`
+recorded in its draft folder: a `Next:` line for a target run that updates the family's Target version with the
+Past phrasings bullets the save added that it lacks (none added: no line), or, when the family has no Target
+version yet, one that creates it from the application's resume; and a `Next:` line for setup when the role is
+not among direction.md's Target roles (tier `none`). After rank, a `Next:` line for a target run when
+direction.md's first target role has no Target version: `--family <target>` (rank only) names that role's
+family's Target version, or the name a target run for it would take, as application.py start's --family does;
+it is needed (else exit 2) while outputs/resumes/ holds a Target version and the target roles are not empty,
+and the line shows when no Target version has that name; with no target roles, no line. Then the fresh-session
+line, or a `Complete:` line when neither a `Next:` line nor "Also available" follows (the run did what it had
+to; the session can end). "Also available" names a mode outside the flows only when this Log's state calls
+for it and no `Next:` line covers it (audit while more than one entry is `stub` or `imported` and no `Next:` line
+names consolidate or audit; never after audit). `--for <mode>`: setup ran because the Trigger check of <mode>
+started it, so the block sends the user back to <mode> in this session. `--no-posting` (fit only):
+the run answered a question with no posting ("does <company> sponsor?"), so no next step follows
+from a posting's fit, and the block names none. With Log changes
+uncommitted or commits not pushed, it says so in place of the fresh-session line and exits 1; for
+commits not pushed, its `next:` line names `sync.py push`. For log it prints only that Target version
+line, measured from log's last commit (HEAD~1, or --since), or nothing; nothing in an unattended run.
+--session <key>: when it exits 0, every claim of that session is released (an unattended run too);
+its record stays, so the session goes on idle with its key. On exit 1 the claims stay while the
+session settles what is not saved; a session that cannot settle it keeps them, as a crashed one does.
+
+Exit 1 when the check ends the run (a `next: stop:` line, or this Python is too old), 2 on a bad
+argument, 0 otherwise. -h or --help prints this text and exits 0. Standard library only.
+Python 3.11+ (tomllib); an older Python gets as far as saying so, and where a newer one is.
+"""
+import glob
+import json
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))   # through a skill link too
+ROOT = os.path.dirname(HERE)
+WINDOWS = os.name == "nt"
+LINUX = platform.system() == "Linux"
+MIN_PYTHON = (3, 11)
+MIN_NODE = 18
+MODES = ["log", "consolidate", "interview", "stories", "fit", "write", "rank", "scan", "import", "audit", "setup"]
+UNATTENDED = bool(os.environ.get("CAREER_LOG_UNATTENDED"))
+
+# The tools of Machine setup: TOOLS are optional (machine.toml), the rest of NEEDS's are required.
+# `hard`: the step that needs it cannot run without it. `soft`: that step has a fallback
+# (browser.md › Fallback order). Either way only the step that needs the tool waits on it (WHEN),
+# never the whole mode.
+TOOLS = ["playwright-cli", "speech"]
+NEEDS = {
+    "fit": [("playwright-cli", "soft")],
+    "write": [("tinytex", "hard"), ("playwright-cli", "soft")],
+    "rank": [("playwright-cli", "soft")],
+    "scan": [("tinytex", "soft"), ("playwright-cli", "soft")],
+    "interview": [("playwright-cli", "soft"), ("speech", "soft")],
+    "stories": [("speech", "soft")],   # a behavioural question practised out loud
+    "import": [("playwright-cli", "soft")],
+    "setup": [("playwright-cli", "soft"), ("tinytex", "soft"), ("speech", "soft")],
+    "browser": [("playwright-cli", "soft")],   # not a mode: browser.md's own check, before a first open
+}
+WHAT = {
+    "playwright-cli": "Node 18+ (unless one is already installed), Microsoft's playwright-cli"
+                      " in npm's global folder, and its skill in this checkout, ignored by git"
+                      + (" (about 150 MB in all; Edge stands in for Chrome, so with Edge installed no Chromium is downloaded)"
+                         if WINDOWS else
+                         ", and, when Chrome and Edge are both missing, Chromium in Playwright's cache in your"
+                         " home folder (about 400 MB in all; about 150 MB with Chrome or Edge installed (on"
+                         " macOS, in /Applications))"),
+}
+NAME = {"playwright-cli": "playwright-cli", "speech": "speech.py"}
+PURPOSE = {"playwright-cli": "reads web pages that show their content only after their scripts run"
+                             " or you sign in"}
+FEATURE = {"playwright-cli": "Browser capture", "speech": "Transcription with times (tools/speech.py)"}
+WHEN = {"playwright-cli": "when a page needs a Browser capture (item 2 of browser.md, Fallback order)",
+        "tinytex": "when a step builds a PDF",
+        "speech": "when a practice round takes a spoken answer"}
+# How to run setup when it installs something: TinyTeX outlasts a shell tool's usual time limit.
+RUN_SETUP = "as a background command, and wait for it to end (it can take 5-20 minutes)"
+
+
+class Context:
+    def __init__(self, mode, root=ROOT, home=None, session=None):
+        self.mode = mode
+        self.root = root
+        self.session = session   # this session's key (--session, or the one check_session_key makes)
+        self.home = home or os.path.expanduser("~")
+        self.machine_toml = os.path.join(self.home, ".career-log", "machine.toml")
+
+
+def setup_cmd(root, yes=(), no=()):
+    """The setup command, its path in single quotes: PowerShell, bash and zsh all read them."""
+    if WINDOWS:
+        path = os.path.join(root, "tools", "setup.ps1").replace("'", "''")
+        cmd = "powershell -ExecutionPolicy Bypass -File '%s'" % path
+        return cmd + (" -Yes " + ",".join(yes) if yes else "") + (" -No " + ",".join(no) if no else "")
+    cmd = "sh '%s/tools/setup.sh'" % root.replace("'", "'\\''")
+    return cmd + (" --yes " + ",".join(yes) if yes else "") + (" --no " + ",".join(no) if no else "")
+
+
+def install_cmd(ctx, tool, yes=True):
+    """The command that records the user's yes (installing the tool) or no for an optional tool:
+    speech.py sets itself up; the others go through tools/setup.sh or setup.ps1."""
+    if tool == "speech":
+        return "%s setup %s" % (tool_cmd(ctx.root, "speech.py"), "--yes" if yes else "--no")
+    return setup_cmd(ctx.root, yes=[tool]) if yes else setup_cmd(ctx.root, no=[tool])
+
+
+def run_how(tool):
+    if tool == "speech":
+        return ("as a background command, and wait for it to end (it downloads about %.1f GB)"
+                % tools_module("speech").plan()[3])
+    return RUN_SETUP
+
+
+def run(cmd, timeout=30):
+    """(exit code, stdout+stderr) of a command, or (None, why) when it cannot start."""
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, str(e)
+    return p.returncode, p.stdout + p.stderr
+
+
+# ---- Python ----
+
+def newer_pythons(home):
+    """Python 3.11+ interpreters off this one's PATH, where setup puts them."""
+    if WINDOWS:
+        paths = logfiles.glob_under(os.environ.get("LOCALAPPDATA", ""), "Programs", "Python", "Python3*", "python.exe")
+        minor = lambda path: re.fullmatch(r"python3(\d+)", os.path.basename(os.path.dirname(path)).lower())
+    else:
+        paths = logfiles.glob_under(home, ".local", "bin", "python3.*")
+        minor = lambda path: re.fullmatch(r"python3\.(\d+)", os.path.basename(path))
+    found = []
+    for path in paths:
+        m = minor(path)
+        if m and int(m.group(1)) >= MIN_PYTHON[1] and os.access(path, os.X_OK):
+            found.append((int(m.group(1)), path))
+    return [path for _, path in sorted(found, reverse=True)]
+
+
+def check_python(ctx):
+    v = sys.version_info
+    version = "%d.%d.%d" % (v[0], v[1], v[2])
+    if v[:2] >= MIN_PYTHON:
+        return ["python: ok (%s)" % version], [], False
+    lines = ["python: too old (%s at %s; career-log needs 3.11+)" % (version, sys.executable)]
+    newer = newer_pythons(ctx.home)
+    if newer:
+        nexts = ["next: run this check again with %s in place of %s, and use that command for every"
+                 " %s in this skill" % (newer[0], python_cmd(), python_cmd())]
+    elif UNATTENDED:
+        nexts = ["next: stop: setup is needed on this machine: career-log needs Python 3.11+, and this"
+                 " is %s. This run is unattended (CAREER_LOG_UNATTENDED), so it installs nothing: say so"
+                 " in the run's result." % version]
+    else:
+        nexts = ["next: stop: setup is not done on this machine: career-log needs Python 3.11+, and"
+                 " this is %s. Ask the user whether to run this machine's setup now: Python 3.13, and TinyTeX"
+                 " with poppler, for their user only (about 180 MB to download; about 250 MB when no poppler is installed): `%s`. On yes run it %s;"
+                 " then run this check again with the command its output names."
+                 % (version, setup_cmd(ctx.root), RUN_SETUP)]
+    return lines, nexts, True
+
+
+# ---- machine.toml ----
+
+def read_choices(ctx):
+    """{tool: True|False} from machine.toml; (None, error) when it does not parse."""
+    if not os.path.exists(ctx.machine_toml):
+        return {}, None
+    import tomllib
+    try:
+        with open(ctx.machine_toml, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as e:
+        return None, str(e)
+    return {k: v for k, v in data.items() if k in TOOLS and isinstance(v, bool)}, None
+
+
+# ---- Tool detection ----
+
+def which(name, extra_dirs):
+    """(path, on_path) for the first `name` on PATH, else in extra_dirs (on_path False)."""
+    found = shutil.which(name)
+    if found:
+        return found, True
+    exts = [".exe", ".cmd", ".bat", ""] if WINDOWS else [""]
+    for d in extra_dirs:
+        for ext in exts:
+            p = os.path.join(d, name + ext)
+            if os.path.isfile(p):
+                return p, False
+    return None, False
+
+
+def node_dirs(home):
+    if WINDOWS:
+        local = os.environ.get("LOCALAPPDATA", "")
+        return (sorted(logfiles.glob_under(local, "Microsoft", "WinGet", "Packages", "OpenJS.NodeJS*", "node-*"), reverse=True)
+                + [os.path.join(local, "Microsoft", "WinGet", "Links"),
+                   os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "nodejs")])
+    # setup's links to nvm's Node first, then nvm's versions, newest first
+    nvm = logfiles.glob_under(home, ".nvm", "versions", "node", "*", "bin")
+    key = lambda d: [int(n) for n in re.findall(r"\d+", os.path.basename(os.path.dirname(d)))]
+    return [local_bin(home)] + sorted(nvm, key=key, reverse=True)
+
+
+def local_bin(home):
+    return os.path.join(home, ".local", "bin")
+
+
+def broken_links(home):
+    """setup's links in ~/.local/bin whose nvm version was uninstalled (macOS, Linux)."""
+    paths = [os.path.join(local_bin(home), b) for b in ("node", "npm", "playwright-cli")]
+    return [] if WINDOWS else [p for p in paths if os.path.islink(p) and not os.path.exists(p)
+                               and "/.nvm/" in os.readlink(p)]
+
+
+def npm_bin_dirs(home):
+    """Where `npm install -g` puts commands: %APPDATA%\\npm for an installed Node (its copy in a
+    packaged app's store first, as resume.APPDATA_STORE says), the Node folder itself for winget's
+    per-user zip, and nvm's bin folder elsewhere."""
+    if WINDOWS:
+        local = os.environ.get("LOCALAPPDATA", "")   # escaped: its folder may hold [ ] (a user name like dev[1])
+        store = glob.glob(resume_module().APPDATA_STORE.replace("%LOCALAPPDATA%", glob.escape(local)) + "npm") if local else []
+        return [os.path.normpath(d) for d in sorted(store)] + [os.path.join(os.environ.get("APPDATA", ""), "npm")] + node_dirs(home)
+    return node_dirs(home)
+
+
+def path_reload(dirs):
+    dirs = list(dict.fromkeys(dirs))
+    if WINDOWS:
+        return ("$env:Path = '%s;' + [Environment]::GetEnvironmentVariable('Path','Machine') + ';'"
+                " + [Environment]::GetEnvironmentVariable('Path','User')" % ";".join(dirs))
+    return 'export PATH="%s:$PATH"' % ":".join(dirs)
+
+
+def chrome_installed():
+    if WINDOWS:
+        roots = [os.environ.get(k, "") for k in ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)")]
+        return any(os.path.isfile(os.path.join(r, "Google", "Chrome", "Application", "chrome.exe")) for r in roots if r)
+    if platform.system() == "Darwin":   # playwright-core's chrome channel looks here only, not in ~/Applications
+        return os.path.exists("/Applications/Google Chrome.app")
+    return os.path.isfile("/opt/google/chrome/chrome")
+
+
+# Where playwright-core's msedge channel finds Edge off Windows (on macOS, /Applications only)
+EDGE_PATHS = {"Darwin": ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
+              "Linux": ["/opt/microsoft/msedge/msedge"]}
+
+
+def edge_installed():
+    """Edge where playwright-core looks for it: playwright-cli picks it when Chrome is missing."""
+    if not WINDOWS:
+        return any(os.path.isfile(p) for p in EDGE_PATHS.get(platform.system(), []))
+    roots = [os.environ.get(k, "") for k in ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)")]
+    return any(os.path.isfile(os.path.join(r, "Microsoft", "Edge", "Application", "msedge.exe")) for r in roots if r)
+
+
+def playwright_cache(home):
+    if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        return os.environ["PLAYWRIGHT_BROWSERS_PATH"]
+    if WINDOWS:
+        return os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+    if platform.system() == "Darwin":
+        return os.path.join(home, "Library", "Caches", "ms-playwright")
+    return os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.join(home, ".cache"), "ms-playwright")
+
+
+def pinned_chromium(cli):
+    """[Chromium's folder names, the headless shell's]: the folders in Playwright's cache this
+    playwright-cli may launch Chromium from, named as playwright-core's registry names them from the
+    browsers.json beside its cli.js: `<name>-<revision>`, or `<name>_<host>_special-<revision>` for a
+    revisionOverrides entry. Any host's override counts: this check does not work out playwright-core's
+    host name. With no channel, a headless launch takes the headless shell, so both are needed.
+    None when there is no playwright-cli or its browsers.json cannot be read."""
+    core = playwright_core_cli(cli) if cli else None
+    try:
+        with open(os.path.join(os.path.dirname(core), "browsers.json"), encoding="utf-8") as f:
+            browsers = {b.get("name"): b for b in json.load(f)["browsers"]}
+        pinned = []
+        for name in ("chromium", "chromium-headless-shell"):
+            prefix, entry = name.replace("-", "_"), browsers[name]
+            overrides = entry.get("revisionOverrides") or {}
+            pinned.append(["%s-%s" % (prefix, entry["revision"])]
+                          + ["%s_%s_special-%s" % (prefix, host, rev) for host, rev in overrides.items()])
+        return pinned
+    except (TypeError, OSError, ValueError, KeyError, AttributeError):
+        return None
+
+
+def chromium_installed(home, pinned):
+    """True when Playwright's cache holds a folder of each list in `pinned` (pinned_chromium), False
+    when it lacks one, None when nothing is pinned to compare with but the cache holds some Chromium."""
+    cache = playwright_cache(home)
+    if pinned is None:
+        return None if logfiles.glob_under(cache, "chromium-*", "INSTALLATION_COMPLETE") else False
+    return all(any(cached(cache, f) for f in names) for names in pinned)
+
+
+def cached(cache, folder):
+    return os.path.isfile(os.path.join(cache, folder, "INSTALLATION_COMPLETE"))
+
+
+def unpinned(cli):
+    """Why a Chromium in the cache cannot be compared with the revision playwright-cli launches."""
+    return ("its revision is checked once playwright-cli is installed" if not cli else
+            "playwright-cli's playwright-core has no readable browsers.json to give the revision it launches")
+
+
+def home_chrome(home):
+    """macOS's ~/Applications Chrome, which playwright-core does not look for, or None."""
+    app = os.path.join(home, "Applications", "Google Chrome.app")
+    return app if platform.system() == "Darwin" and os.path.exists(app) else None
+
+
+def missing_libraries(home, pinned):
+    """True when ldd finds a library missing for a downloaded Chromium, as Playwright checks at launch:
+    for the `pinned` folders when they are known, else for every revision's."""
+    cache = playwright_cache(home)
+    folders = [f for names in pinned for f in names] if pinned else ["chromium-*", "chromium_headless_shell-*"]
+    for binary in [b for f in folders for b in logfiles.glob_under(cache, f, "chrome-linux*", "chrome")
+                   + logfiles.glob_under(cache, f, "chrome-*", "chrome-headless-shell")]:
+        code, out = run(["ldd", binary])
+        if code is not None and "not found" in out:
+            return True
+    return False
+
+
+def cli_configs(ctx):
+    """playwright-cli's config files that exist, as (where, path): this checkout's, then the global one."""
+    places = [("this checkout", os.path.join(ctx.root, ".playwright", "cli.config.json")),
+              ("global", os.path.join(ctx.home, ".playwright", "cli.config.json"))]
+    return [(where, path) for where, path in places if os.path.isfile(path)]
+
+
+def load_cli_config(path):
+    """(config, error): a JSON config as a dict ({} when it holds no object), None for one that is not
+    JSON (playwright-cli reads it as INI; this check does not), or the error for JSON that does not parse."""
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            text = f.read()
+    except (OSError, UnicodeDecodeError) as e:
+        return None, str(e)
+    def no_constant(name):   # JavaScript's JSON.parse has no NaN or Infinity
+        raise ValueError("%s is not JSON" % name)
+    try:
+        data = json.loads(text, parse_constant=no_constant)
+    except ValueError as e:
+        return None, (str(e) if text.lstrip().startswith("{") else None)
+    if data is None:   # playwright-core fails on a config that is null
+        return None, "the file holds null"
+    return (data if isinstance(data, dict) else {}), None
+
+
+def config_browser(configs):
+    """The browser playwright-cli launches with these configs (dicts, the global one first), merged
+    as playwright-core's resolveCLIConfigForCLI does: each later file's keys over the earlier ones',
+    a channel kept only while the merged browserName is chromium, and no browserName meaning Chrome.
+    "Chrome", "Edge" or "Chromium", else what the configs set that this check does not look for."""
+    name = channel = None
+    for config in configs:
+        if config is None:
+            return "a format other than JSON"
+        if config.get("extension"):
+            return "extension"
+        browser = config.get("browser") if isinstance(config.get("browser"), dict) else {}
+        launch = browser.get("launchOptions") if isinstance(browser.get("launchOptions"), dict) else {}
+        for key, value in (("cdpEndpoint", browser.get("cdpEndpoint")), ("remoteEndpoint", browser.get("remoteEndpoint")),
+                           ("executablePath", launch.get("executablePath"))):
+            if value:
+                return key
+        name = browser["browserName"] if browser.get("browserName") is not None else name
+        channel = launch["channel"] if "channel" in launch else channel   # a null channel overrides too
+        if name != "chromium" and not str(channel).startswith("moz-"):
+            channel = None
+    if name is None:
+        return "Chrome"
+    if name != "chromium":
+        return 'browserName "%s"' % name
+    return {None: "Chromium", "chromium": "Chromium", "chrome": "Chrome", "msedge": "Edge"}.get(
+        channel, 'channel "%s"' % channel)
+
+
+# playwright-core's environment variables that override the browser the config files name
+BROWSER_ENV = ["PLAYWRIGHT_MCP_BROWSER", "PLAYWRIGHT_MCP_EXECUTABLE_PATH", "PLAYWRIGHT_MCP_CDP_ENDPOINT",
+               "PLAYWRIGHT_MCP_EXTENSION", "PLAYWRIGHT_MCP_CONFIG"]
+
+
+def config_names_chromium(configs):
+    """True when `configs` (from cli_configs) make `playwright-cli open` launch Playwright's own
+    Chromium. False when a config does not load or a BROWSER_ENV override is set, the cases where
+    config_state names no browser."""
+    if not configs or any(os.environ.get(k) for k in BROWSER_ENV):
+        return False
+    loaded = [load_cli_config(path) for _, path in configs]
+    if any(error for _, error in loaded):
+        return False
+    return config_browser([config for config, _ in loaded][::-1]) == "Chromium"
+
+
+def config_state(ctx, configs, chrome, chromium, cli):
+    """The config line, and the question to ask when the browser the config names is missing or
+    the config does not parse: ("ask", fact, question), or None. `chromium` is chromium_installed's."""
+    paths = " and ".join(path for _, path in configs)
+    checkout_only = [w for w, _ in configs] == ["this checkout"]
+    if len(configs) == 2:
+        where = "this checkout, over the global %s" % configs[1][1]
+    else:
+        where = "this checkout" if checkout_only else "global, %s" % paths
+    command = "`playwright-cli install --skills` from %s" % ctx.root
+    loaded = []
+    for place, path in configs:
+        config, error = load_cli_config(path)
+        if error:
+            if place == "global":
+                choice = "; it is global, read in every folder, so it stays theirs to edit."
+            else:
+                choice = " or to let you delete it%s." % (" (%s then writes a new one)" % command if checkout_only else "")
+            return ("playwright-cli config: unreadable (%s: %s)" % (path, error),
+                    ("ask", "playwright-cli cannot start with its config %s (%s)." % (path, error),
+                     "Show the user the file and the error, and ask them to fix it" + choice))
+        loaded.append(config)
+    env = next((k for k in BROWSER_ENV if os.environ.get(k)), None)
+    if env:
+        return ("playwright-cli config: present (%s; %s is set, which this check does not look for)" % (where, env),
+                None)
+    browser = config_browser(loaded[::-1])
+    present = {"Chrome": chrome, "Edge": edge_installed(),
+               "Chromium": chromium}.get(browser)
+    if browser == "Chromium" and chromium is None:
+        return ("playwright-cli config: present (%s; Chromium, in %s; %s)" % (where, playwright_cache(ctx.home), unpinned(cli)),
+                None)
+    if present is None:
+        return ("playwright-cli config: present (%s; it sets %s, which this check does not look for)" % (where, browser),
+                None)
+    if present:
+        return "playwright-cli config: ok (%s; %s)" % (where, browser), None
+    options = []
+    picks = "Chrome" if chrome else "Edge" if edge_installed() else None
+    download = "downloads Chromium into Playwright's cache%s" % (" (about 320 MB)" if WINDOWS else "")
+    if checkout_only and (picks or browser != "Chromium"):
+        options.append("delete it and run %s, which then %s" % (
+            command, "picks %s, the browser this machine has" % picks if picks else download))
+    moved = home_chrome(ctx.home) if browser == "Chrome" else None
+    if browser == "Chromium":
+        options.append("run %s, which %s" % (command, download))
+    elif moved:
+        options.append("move %s into /Applications" % moved)
+    else:
+        options.append("install %s themselves" % browser)
+    missing = ("not in %s" % playwright_cache(ctx.home) if browser == "Chromium" else
+               "not in /Applications, where playwright-cli looks (it is in %s)" % moved if moved else "not installed")
+    return ("playwright-cli config: browser missing (%s; names %s, %s)" % (where, browser, missing),
+            ("ask", "the playwright-cli config %s names %s, which is %s." % (paths, browser, missing),
+             "Ask the user once whether to %s." % ", or to ".join(options)))
+
+
+def playwright_core_cli(cli_path):
+    """playwright-core's cli.js inside the installed @playwright/cli package."""
+    real = os.path.realpath(cli_path)
+    cands = [os.path.join(os.path.dirname(real), "node_modules", "playwright-core", "cli.js"),
+             os.path.join(os.path.dirname(real), "node_modules", "@playwright", "cli", "node_modules", "playwright-core", "cli.js"),
+             os.path.join(os.path.dirname(os.path.dirname(real)), "lib", "node_modules", "@playwright", "cli", "node_modules", "playwright-core", "cli.js")]
+    return next((c for c in cands if os.path.isfile(c)), None)
+
+
+def node_version(node):
+    code, out = run([node, "--version"])
+    m = re.match(r"v(\d+)\.", out.strip()) if code == 0 else None
+    return (int(m.group(1)), out.strip()) if m else (None, None)
+
+
+def playwright_state(ctx):
+    """lines, machine-level missing pieces, checkout-level missing pieces, PATH dirs to add.
+
+    A machine-level piece is a name setup installs, `sudo:<what>:<command>` for one that needs
+    sudo (Linux), or `user:<what>:<instruction>` for one setup cannot install. A checkout-level
+    piece is a name `install --skills` writes, or ("ask", fact, question) for the user's choice."""
+    lines, machine, checkout, off_path = [], [], [], []
+    node, on_path = which("node", node_dirs(ctx.home))
+    major, version = node_version(node) if node else (None, None)
+    if on_path and major is not None and major < MIN_NODE:
+        # An old Node first on PATH (a distribution's package); setup's newer one is off it
+        for d in node_dirs(ctx.home):
+            newer = os.path.join(d, "node.exe" if WINDOWS else "node")
+            if os.path.isfile(newer):
+                m, v = node_version(newer)
+                if m is not None and m >= MIN_NODE:
+                    node, on_path, major, version = newer, False, m, v
+                    break
+    if not node or major is None:
+        lines.append("node: missing")
+        machine.append("node")
+    elif major < MIN_NODE:
+        lines.append("node: too old (%s; needs %d+)" % (version, MIN_NODE))
+        machine.append("old node")
+    elif (not on_path and not WINDOWS and os.path.dirname(node) != local_bin(ctx.home)
+          and not os.path.lexists(os.path.join(local_bin(ctx.home), "node"))):
+        # nvm's Node with no link in ~/.local/bin: a setup from before the links makes them
+        lines.append("node: ok but not on this shell's PATH (%s); setup links it into %s" % (node, local_bin(ctx.home)))
+        machine.append("links in %s" % local_bin(ctx.home))
+    elif not on_path:
+        lines.append("node: ok but not on this shell's PATH (%s)" % node)
+        off_path.append(os.path.dirname(node))
+    else:
+        lines.append("node: ok (%s)" % version)
+    for link in broken_links(ctx.home):
+        lines.append("%s: broken link (%s was uninstalled)" % (link, os.readlink(link)))
+        links = "links in %s" % local_bin(ctx.home)
+        if "broken " + links not in machine:
+            machine[:] = [m for m in machine if m != links] + ["broken " + links]
+    cli, on_path = which("playwright-cli", npm_bin_dirs(ctx.home))
+    if not cli:
+        lines.append("playwright-cli: missing")
+        machine.append("playwright-cli")
+    elif not on_path:
+        lines.append("playwright-cli: ok but not on this shell's PATH (%s)" % cli)
+        off_path.append(os.path.dirname(cli))
+    else:
+        lines.append("playwright-cli: ok")
+    chrome = chrome_installed()
+    edge = not chrome and edge_installed()
+    pinned = pinned_chromium(cli)
+    chromium = chromium_installed(ctx.home, pinned)
+    cache = playwright_cache(ctx.home)
+    if chrome:
+        lines.append("browser: ok (Chrome)")
+    elif edge:
+        lines.append("browser: ok (Edge)")
+    elif chromium:
+        have = [next(f for f in names if cached(cache, f)) for names in pinned]
+        lines.append("browser: ok (%s in %s)" % (" and ".join(have), cache))
+    elif chromium is None:   # no browser step: with no playwright-cli, setup installs it; with no
+        # readable browsers.json, a fresh install would not tell the revision either
+        lines.append("browser: present (Chromium in %s; %s)" % (cache, unpinned(cli)))
+    else:
+        found = sorted(os.path.basename(os.path.dirname(p))
+                       for p in logfiles.glob_under(cache, "chromium*-*", "INSTALLATION_COMPLETE"))
+        stale = [f for f in found if pinned and not any(f in names for names in pinned)]
+        lacking = [names[0] for names in pinned if not any(cached(cache, f) for f in names)] if pinned else ["Chromium"]
+        moved = home_chrome(ctx.home)
+        lines.append("browser: missing (%sno %s in %s%s)" % (
+            "Chrome is in %s, not in /Applications, where playwright-cli looks; " % moved if moved else
+            "no Chrome, no Edge, ",
+            " and ".join(lacking), cache, "; found %s, which this playwright-cli does not launch" % ", ".join(stale) if stale else ""))
+        if not moved or not cli_configs(ctx):   # no config: setup downloads Chromium (setup.sh, like this
+            # check, ignores ~/Applications); with a config, its line asks about the browser it names instead
+            machine.append("browser")
+    configs = cli_configs(ctx)
+    # Chrome's and Edge's packages bring their libraries; a config naming Chromium launches it even
+    # with them installed, once it is downloaded (until then the config line asks about it)
+    chromium_launched = (not chrome and not edge) or (chromium is not False and config_names_chromium(configs))
+    if LINUX and chromium_launched and cli and node and "browser" not in machine:
+        core = playwright_core_cli(cli)
+        if not missing_libraries(ctx.home, pinned):
+            lines.append("browser libraries: ok")
+        elif core:
+            lines.append("browser libraries: missing (needs sudo)")
+            machine.append("sudo:Chromium's system libraries:sudo %s %s install-deps chromium" % (node, core))
+        else:   # playwright-core's install-deps downloads no browser; without it, no command here is
+            # libraries only
+            where = os.path.dirname(os.path.realpath(cli))
+            lines.append("browser libraries: missing (playwright-core not found in %s)" % where)
+            machine.append("user:Chromium's system libraries:reinstall playwright-cli with `npm install -g"
+                           " @playwright/cli@latest`, since playwright-core, whose install-deps installs"
+                           " them, is not in %s" % where)
+    skills = [os.path.join(ctx.root, d, "skills", "playwright-cli", "SKILL.md") for d in (".claude", ".agents")]
+    if any(os.path.isfile(s) for s in skills):
+        lines.append("playwright-cli skill: ok (this checkout)")
+    else:
+        lines.append("playwright-cli skill: missing (this checkout)")
+        checkout.append("skill")
+    unignored = unignored_files(ctx.root)
+    if unignored:
+        lines.append("playwright-cli files: not ignored by git (%s)" % ", ".join(unignored))
+        checkout.append(("ask-git", "git does not ignore what playwright-cli writes in this checkout (%s), so a"
+                         " commit could take it along." % ", ".join(unignored),
+                         "Ask the user whether to add %s to %s, the lines the Template keeps under"
+                         " `# Browser capture`." % (", ".join("`%s/`" % f for f in unignored),
+                                                     os.path.join(ctx.root, ".gitignore"))))
+    elif unignored is not None:
+        lines.append("playwright-cli files: ignored by git")
+    if configs:   # install --skills keeps a config it finds, here or global, and picks no browser
+        line, ask = config_state(ctx, configs, chrome, chromium, cli)
+        lines.append(line)
+        if ask:
+            checkout.append(ask)
+    elif not chrome:
+        lines.append("playwright-cli config: missing (this checkout; picks %s when Chrome is missing)"
+                     % ("Edge" if edge else "Chromium"))
+        checkout.append("config")
+    return lines, machine, checkout, off_path
+
+
+# The folders playwright-cli writes in a checkout, which .gitignore keeps out of git
+PLAYWRIGHT_FILES = [".claude/skills/playwright-cli", ".agents/skills/playwright-cli", ".playwright", ".playwright-cli"]
+
+
+def ignored(root, paths):
+    """The paths (relative to root) git's ignore rules leave out, whether or not they exist; None when
+    git cannot tell (no git, or root not in a repository)."""
+    try:
+        p = subprocess.run(["git", "-C", root, "-c", "core.quotepath=false", "check-ignore", "--no-index", "--"] + paths,
+                           capture_output=True, encoding="utf-8", errors="replace", timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if p.returncode not in (0, 1):   # 1: none of them is ignored
+        return None
+    return {l.strip().replace("\\", "/") for l in p.stdout.splitlines()}
+
+
+def unignored_files(root):
+    """The PLAYWRIGHT_FILES folders git would not ignore a file in; None when git cannot tell."""
+    probes = {f: f + "/probe" for f in PLAYWRIGHT_FILES}
+    found = ignored(root, list(probes.values()))
+    return None if found is None else [f for f, probe in probes.items() if probe not in found]
+
+
+def missing_clause(items):
+    """Machine pieces as one clause: "node and playwright-cli are missing", "the links in <dir> are
+    broken and playwright-cli is missing". An item is a name setup installs, `links in <dir>`
+    (setup's links to nvm's Node, not made yet), `broken links in <dir>` or `old node`."""
+    def joined(names):
+        return names[0] if len(names) == 1 else "%s and %s" % (", ".join(names[:-1]), names[-1])
+    def clause(items, state):
+        names = ["the " + i if i.startswith("links ") else "a browser" if i == "browser" else i for i in items]
+        plural = len(items) > 1 or items[0].startswith("links ") or items[0].endswith("libraries")
+        return "%s %s %s" % (joined(names), "are" if plural else "is", state)
+    states = {"broken ": "broken", "old ": "too old"}
+    groups = {}
+    for i in items:
+        prefix = next((p for p in states if i.startswith(p)), "")
+        groups.setdefault(prefix, []).append(i[len(prefix):])
+    clauses = [clause(groups[p], states.get(p, "missing")) for p in ("broken ", "old ", "") if p in groups]
+    return " and ".join(clauses)
+
+
+def tools_module(name):
+    """A script beside this one, imported: -I leaves this folder off sys.path."""
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    sys.dont_write_bytecode = True   # no tools/__pycache__ left in the Log
+    return __import__(name)
+
+
+def resume_module():
+    """tools/resume.py, which finds TinyTeX and poppler for both scripts."""
+    return tools_module("resume")
+
+
+def tinytex_state(ctx):
+    resume = resume_module()
+    lines, machine = [], []
+    tex = resume.tex_bin("pdflatex")
+    lines.append("pdflatex: ok (%s)" % tex if tex else "pdflatex: missing")
+    if not tex:
+        machine.append("pdflatex")
+    pdftotext = resume.poppler_bin("pdftotext", ctx.home)
+    if pdftotext:
+        lines.append("pdftotext: ok (%s; %s)" % (pdftotext, poppler_source(ctx, pdftotext)))
+    else:   # setup installs conda-forge's into its micromamba environment, with no admin step (#281)
+        lines.append("pdftotext: missing (poppler's, with -bbox-layout)")
+        machine.append("poppler")
+    return lines, machine, [], []
+
+
+def poppler_source(ctx, pdftotext):
+    """Where the poppler in use came from, and how it is updated. Told by its path, which is what
+    tools/resume.py uses; the `poppler` line setup writes into machine.toml only records it."""
+    env = os.path.normcase(os.path.abspath(tools_module("resume").poppler_env(ctx.home)))
+    if os.path.normcase(os.path.abspath(pdftotext)).startswith(env + os.sep):
+        return "setup's micromamba environment; rerun setup to update it"
+    return "the user's own install; setup leaves it as it is, and the tool that installed it updates it"
+
+
+def speech_state(ctx):
+    """tools/speech.py's environment in ~/.career-log/speech: `speech: ok|missing|outdated`."""
+    st, detail = tools_module("speech").state(ctx.home)
+    line = "speech: %s%s" % (st, " (%s)" % detail if detail else "")
+    return [line], {"ok": [], "missing": ["speech"], "outdated": ["old speech"]}[st], [], None
+
+
+STATE = {"playwright-cli": playwright_state, "tinytex": tinytex_state, "speech": speech_state}
+
+
+def speech_offer(ctx):
+    """The offer of #707: the three ways to take a spoken answer, and what each gives."""
+    backend, gpu, _, gb = tools_module("speech").plan()
+    where = ("on the NVIDIA GPU" if gpu else "on the Apple GPU" if backend == "mlx-whisper" else "on the CPU")
+    return ('ask the user once, in these words: "To hear a spoken answer, I need its words. Three ways:'
+            " 1. speech.py (recommended): a transcript with times, so a talk's length, pace, pauses and part"
+            ' timings, and the words a second model heard differently; all on this machine, nothing uploaded.'
+            ' It installs %s with its models (about %.1f GB), %s, for your user only, in %s.'
+            " 2. This app's own voice input: a transcript only. No times, so no pauses, pace or part timings"
+            ' (you time a talk with a stopwatch), and dictation may tidy slips and restarts away.'
+            ' 3. Typing or pasting: the content only. Your answer is kept in %s, so I will not ask again on'
+            ' this machine." On 1 run `%s` %s; on 2 or 3 run `%s`, and the round takes the answer that way.'
+            ' Then run this check again.'
+            % (backend, gb, where, tools_module("speech").speech_dir(ctx.home), ctx.machine_toml,
+               install_cmd(ctx, "speech"), run_how("speech"), install_cmd(ctx, "speech", yes=False)))
+
+
+def offer(ctx, tool, kind):
+    if tool == "speech":
+        return speech_offer(ctx)
+    need = (" %s cannot do that without it." % ctx.mode) if kind == "hard" and ctx.mode != "setup" else ""
+    return ('ask the user once, in these words: "%s %s.%s Install it on this machine? It installs'
+            ' %s, for your user only. Your answer is kept in %s, so I will not ask again on this'
+            ' machine." Any answer but yes is a no. On yes run `%s` %s; on no run `%s`. Then run this'
+            ' check again.'
+            % (NAME[tool], PURPOSE[tool], need, WHAT[tool], ctx.machine_toml,
+               install_cmd(ctx, tool), RUN_SETUP, install_cmd(ctx, tool, yes=False)))
+
+
+def check_tools(ctx):
+    needs = NEEDS.get(ctx.mode, [])
+    if not needs:
+        return [], [], False
+    choices, error = read_choices(ctx)
+    if choices is None:
+        return (["machine setup: unreadable (%s: %s)" % (ctx.machine_toml, error)],
+                ["next: stop: show the user %s and the error, and rewrite it with one `<tool> ="
+                 " true|false` line for each answer it held (tools: %s); then run this check again."
+                 % (ctx.machine_toml, ", ".join(TOOLS))],
+                True)
+    lines, nexts = [], []
+    for tool, kind in needs:
+        required = tool not in TOOLS
+        choice = True if required else choices.get(tool)
+        lines.append("%s: required" % tool if required else
+                     "%s wanted: %s" % (tool, {True: "yes", False: "no (declined)", None: "not asked"}[choice]))
+        tl, machine, checkout, off_path = STATE[tool](ctx)
+        lines += tl
+        sudo = [m.split(":", 2)[1:] for m in machine if m.startswith("sudo:")]
+        user = [m.split(":", 2)[1:] for m in machine if m.startswith("user:")]
+        machine = [m for m in machine if not m.startswith(("sudo:", "user:"))]
+        # A hard need ends the mode at the step that needs the tool; a soft one falls back.
+        hard = kind == "hard" and ctx.mode != "setup"
+        stop = "stop: " if hard else ""
+        if hard:
+            unavailable = "%s cannot go past this step" % ctx.mode
+        elif tool == "playwright-cli":
+            unavailable = "go to the next item of browser.md, Fallback order"
+        elif tool == "speech":
+            unavailable = "the round takes the answer through this app's voice input, or typed or pasted"
+        else:
+            unavailable = "skip the steps that need it"
+        todo = []
+        missing = machine + [what for what, _ in sudo + user]
+        if missing and choice is None and UNATTENDED and ctx.mode != "setup":
+            todo.append("%s is not offered on this machine yet, and this run is unattended"
+                        " (CAREER_LOG_UNATTENDED), so it asks nothing: offer it in a session with the user;"
+                        " for this run, %s." % (tool, unavailable))
+        elif missing and choice and UNATTENDED:
+            todo.append("%ssetup is needed on this machine: %s. This run is unattended"
+                        " (CAREER_LOG_UNATTENDED), so it installs nothing and asks nothing: say so in the"
+                        " run's result; for this run, %s." % (stop, missing_clause(missing), unavailable))
+        elif choice is False:
+            if hard:
+                todo.append("stop: %s needs %s, which the user turned off on this machine. Tell them, and"
+                            " that saying \"install %s\" turns it on: `%s`."
+                            % (ctx.mode, tool, tool, install_cmd(ctx, tool)))
+            elif ctx.mode == "setup":   # a state: setup has nothing to install, and reads no page
+                lines[-1 - len(tl)] += (" (%s is off on this machine; nothing to do in setup unless the user asks"
+                                        " to install it: `%s`)" % (FEATURE[tool], install_cmd(ctx, tool)))
+            else:
+                todo.append("%s is off on this machine (the user declined %s): %s. Install it only when"
+                            " the user asks for it: `%s`."
+                            % (FEATURE[tool], tool, unavailable, install_cmd(ctx, tool)))
+        elif choice is None and missing and ctx.mode == "setup":   # setup's own round asks
+            if tool == "speech":   # setup's round does not ask: the mode that needs it offers it
+                lines[-1 - len(tl)] += " (offered when a practice round first takes a spoken answer)"
+            elif os.path.exists(os.path.join(ctx.root, "config.toml")):
+                lines[-1 - len(tl)] += " (the user skipped it in setup; the skill offers it when a mode needs it)"
+        elif choice is None and missing:
+            todo.append(offer(ctx, tool, kind))
+        elif machine and required:
+            todo.append("%s is part of this machine's setup, and %s: tell the user that setup"
+                        " installs it now, with no question, then run `%s` %s; then run this check again."
+                        % (tool, missing_clause(machine), setup_cmd(ctx.root), RUN_SETUP))
+        elif machine:
+            todo.append("the user chose %s on this machine, and %s: run `%s` %s; then run this"
+                        " check again." % (tool, missing_clause(machine), install_cmd(ctx, tool), run_how(tool)))
+        else:
+            if off_path:
+                todo.append("start every command that runs node, npm or playwright-cli in this session"
+                            " with `%s; `" % path_reload(off_path))
+            for what, command in sudo:
+                todo.append("%smissing: %s, which needs sudo. Give the user this command to run in their"
+                            " own terminal, where it asks for their password: `%s`. When they say it ran,"
+                            " run this check again; until then, %s." % (stop, what, command, unavailable))
+            for what, instruction in user:
+                todo.append("%smissing: %s, which setup cannot install here. Tell the user to %s. When"
+                            " they say it is done, run this check again; until then, %s."
+                            % (stop, what, instruction, unavailable))
+            asks = [c for c in checkout if isinstance(c, tuple)]
+            config_asks = [c for c in asks if c[0] == "ask"]
+            for _, fact, question in asks:
+                if UNATTENDED:
+                    todo.append("%s%s This run is unattended (CAREER_LOG_UNATTENDED), so it asks nothing:"
+                                " say so in the run's result; for this run, %s." % (stop, fact, unavailable))
+                else:
+                    todo.append("%s%s %s Do what they choose, then run this check again; until then, %s."
+                                % (stop, fact, question, unavailable))
+            if len(asks) < len(checkout) and not any(c[0] == "ask-git" for c in asks):   # git first ignores what it writes
+                reload = path_reload(off_path) + "; " if off_path else ""
+                # With a config whose browser is missing, the download waits for the user's answer
+                install = "playwright-cli install --skills"
+                if config_asks and WINDOWS:   # PowerShell keeps $env: set for the rest of the session
+                    install = ("$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1'; %s; Remove-Item"
+                               " Env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" % install)
+                elif config_asks:
+                    install = "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 " + install
+                todo.append("from %s run `%s%s` (`--skills agents` for agents that read .agents/skills/),"
+                            " with no question: it writes only files git ignores in this checkout and, when it"
+                            " is missing, about 3 MB of FFmpeg in Playwright's cache." % (ctx.root, reload, install))
+        when = "now, for %s" % tool if ctx.mode == "setup" else "now" if ctx.mode == "browser" else WHEN[tool]
+        nexts += ["next: %s, first: %s" % (when, t) for t in todo]
+    return lines, nexts, False
+
+
+# ---- Uncommitted Log changes ----
+
+logfiles = tools_module("logfiles")
+python_cmd = logfiles.python_cmd   # how a printed command starts Python (SKILL.md › Platforms)
+# The Log's own files (AGENTS.md › Changes); Engine files and the ignored inbox are not reported.
+LOG_PATHS = logfiles.LOG_PATHS
+
+
+def tool_cmd(root, name):
+    """How the agent runs another tool of this Log, its path in double quotes."""
+    return '%s -I "%s"' % (python_cmd(), os.path.join(root, "tools", name))
+
+
+def check_session_key(ctx):
+    """The session's key (ADR 0014): --session's, kept; or, at the session's first check, a new one, whose record
+    holds the baseline (each uncommitted Log file's hash, logfiles.file_hash). Nothing outside a git repository."""
+    if ctx.session:
+        if logfiles.read_session(ctx.root, ctx.session) is None:
+            logfiles.write_session(ctx.root, ctx.session, {"start": None, "baseline": {}, "claims": []})
+            return ["session: %s (its record was gone: made again, with no baseline)" % ctx.session], [], False
+        return ["session: %s" % ctx.session], [], False
+    found = logfiles.uncommitted(ctx.root)
+    if found is None:
+        return [], [], False
+    ctx.session = logfiles.new_session(ctx.root, {path: logfiles.file_hash(ctx.root, path) for _, path, _, _ in found})
+    return ["session: %s (this session's key: give --session %s to every later check, claim, commit and Next up of"
+            " this session; on a rerun of a check, keep the first one)" % (ctx.session, ctx.session)], [], False
+
+
+def log_files(ctx):
+    """[(kind, status, path as shown, owner)] of the uncommitted Log files (logfiles.uncommitted); kind is `own`
+    (claimed by this session), `theirs` (by another session, the owner), `changing` (in this session's baseline,
+    claimed by none, and changed since its first check) or `left` (any other: an earlier session's); None when
+    git fails."""
+    found = logfiles.uncommitted(ctx.root)
+    if found is None:
+        return None
+    record = logfiles.read_session(ctx.root, ctx.session) if ctx.session else None
+    baseline = record["baseline"] if record else {}
+    out = []
+    for status, path, old, owner in found:
+        if owner:
+            kind = "own" if owner == ctx.session else "theirs"
+        elif path in baseline and baseline[path] != logfiles.file_hash(ctx.root, path):
+            kind = "changing"
+        else:
+            kind = "left"
+        out.append((kind, status, path + (" (from %s)" % old if old else ""), owner))
+    return out
+
+
+def check_uncommitted(ctx):
+    """One line per Log file with uncommitted changes, marked by whose it is (log_files); nothing when the Log
+    is clean or git fails. No line asks whether another session is still going (ADR 0014)."""
+    files = log_files(ctx) or []
+    if not files:
+        return [], [], False
+    theirs = [f for f in files if f[0] == "theirs"]
+    lines = ["log changes: uncommitted (%d file(s)%s)"
+             % (len(files), ", %d of them another session's" % len(theirs) if theirs else "")]
+    lines += ["log change: %s %s" % (status, path) for kind, status, path, _ in files if kind == "left"]
+    lines += ["log change (this session): %s %s" % (status, path) for kind, status, path, _ in files if kind == "own"]
+    lines += ["log change (still changing): %s %s" % (status, path) for kind, status, path, _ in files if kind == "changing"]
+    lines += ["log change (session %s): %s %s" % (key, status, path) for kind, status, path, key in theirs]
+    sync = tool_cmd(ctx.root, "sync.py")
+    flag = " --session %s" % ctx.session if ctx.session else ""
+    nexts = []
+    if any(f[0] == "left" for f in files):
+        nexts.append("next: now, first: the `log change:` files above that are not this session's own bulk change"
+                     " waiting for the user's yes are changes an earlier session left. Show the user what `%s status"
+                     " -- <file>...` prints for those files and ask whether to commit them (`%s settle commit%s --"
+                     " <file>...`) or discard them (`%s settle discard%s -- <file>...`, then follow its output),"
+                     " naming those files each time; then go on with the request." % (sync, sync, flag, sync, flag))
+    if any(f[0] == "changing" for f in files):
+        nexts.append("next: now, first: the `log change (still changing):` files above changed since this session's"
+                     " first check, and no session claimed them: another session is still writing them. Keep them out"
+                     " of every settle and commit of this session, and tell the user so in one line.")
+    if theirs:
+        nexts.append("next: now, first: the `log change (session <key>):` files above are claimed by another session"
+                     " in this Log (%s): keep them as they are, out of every settle and commit of this session, and"
+                     " tell the user so in one line. That session saves them itself."
+                     % ", ".join(sorted({key for _, _, _, key in theirs})))
+    return lines, nexts, False
+
+
+# ---- This Log's git state ----
+
+def is_repo(root):
+    """Whether root is the top folder of a git work tree (not a folder inside another repo)."""
+    top = logfiles.git_run(root, "rev-parse", "--show-toplevel")
+    same = lambda path: os.path.normcase(os.path.realpath(path))
+    return top.returncode == 0 and same(top.stdout.strip()) == same(root)
+
+
+def has_origin(root):
+    return logfiles.git_run(root, "remote", "get-url", "origin").returncode == 0
+
+
+def check_git(ctx):
+    """identity, default branch and ahead; read only (sync.py commits, pushes and pulls)."""
+    try:
+        if not is_repo(ctx.root):
+            return ["git: not a repository (%s)" % ctx.root], [], False
+        lines, nexts = [], []
+        _, email = logfiles.local_identity(ctx.root)
+        if email:
+            lines.append("identity: ok (%s)" % email)
+        else:
+            lines.append("identity: missing (no repo-local user.email)")
+            nexts.append("next: when a step commits, first: set this Log's own git identity with the user, as"
+                         " SETUP.md step 3 says: the machine-wide one may belong to someone else, so sync.py"
+                         " commits nothing without it.")
+        if not has_origin(ctx.root):
+            return lines + ["default branch: none (no origin remote)"], nexts, False
+        default = logfiles.default_branch(ctx.root)
+        if default is None:
+            lines.append("default branch: unknown (origin/HEAD is not set)")
+            nexts.append("next: when a step names <default>, first: run `git -C \"%s\" remote set-head origin"
+                         " --auto`; <default> is then what `git -C \"%s\" symbolic-ref --short"
+                         " refs/remotes/origin/HEAD` prints, without `origin/`." % (ctx.root, ctx.root))
+            return lines, nexts, False
+        lines.append("default branch: %s" % default)
+        current = logfiles.git_run(ctx.root, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+        if current != default:   # a scan draft branch, a worktree's own: commits go elsewhere
+            return lines + ["branch: %s (not %s)" % (current or "detached HEAD", default)], nexts, False
+        ahead = logfiles.git_run(ctx.root, "rev-list", "--count", "origin/%s..HEAD" % default)
+        n = ahead.stdout.strip()
+        if ahead.returncode != 0 or not n.isdigit():   # origin/<default> not fetched, or no commit yet
+            lines.append("ahead: unknown")
+        elif n == "0":
+            lines.append("ahead: 0")
+        else:   # no step of its own: a pushing sync.py commit pushes HEAD, these commits with it
+            lines.append("ahead: %s (not on origin yet; a sync.py commit that pushes takes them along, or, in a"
+                         " mode that commits nothing, `sync.py push` at Next up)" % n)
+        return lines, nexts, False
+    except logfiles.LogError as e:   # git cannot start, or gives no answer in time
+        return ["git: unavailable (%s)" % e], [], False
+
+
+def check_pull(ctx):
+    """The pull every mode starts with (SKILL.md › Trigger check), after the other steps; sync.py pulls."""
+    try:   # a branch with no upstream (a detached HEAD too) has nothing to pull from
+        upstream = logfiles.git_run(ctx.root, "rev-parse", "--verify", "-q", "@{upstream}").returncode == 0
+        if not (is_repo(ctx.root) and has_origin(ctx.root) and upstream):
+            return [], [], False
+    except logfiles.LogError:
+        return [], [], False
+    return [], ["next: now, first: run `%s pull` (another clone may have pushed) and follow its output;"
+                " go on once it ends with `sync: ok`, with no rerun of this check for the pull." % tool_cmd(ctx.root, "sync.py")], False
+
+
+# ---- Setup for this Log ----
+
+def check_config(ctx):
+    """Whether setup has run for this Log (config.toml exists and parses), and its Config values."""
+    config_tool = tools_module("config")
+    try:
+        config = config_tool.load(ctx.root)
+    except config_tool.ConfigError as e:
+        return (["config: unreadable (%s)" % e],
+                ["next: stop: show the user the error above, fix the file it names with them so that `%s -I"
+                 " \"%s\" show` prints its fields, then run this check again."
+                 % (python_cmd(), os.path.join(ctx.root, "tools", "config.py"))],
+                True)
+    if config is None and ctx.mode == "setup" and not UNATTENDED:
+        return ["config: missing (setup writes it)"], [], False
+    if config is None and UNATTENDED:
+        return (["config: missing (setup has not run for this Log)"],
+                ["next: stop: setup has not run for this Log, and this run is unattended"
+                 " (CAREER_LOG_UNATTENDED), so it asks nothing: say so in the run's result."], True)
+    if config is None:
+        return (["config: missing (setup has not run for this Log)"],
+                ["next: stop: setup has not run for this Log, so no mode runs yet. Tell the user, and"
+                 " on their yes start the setup mode (SKILL.md, Modes) in place of this request; take"
+                 " the request up again once setup is done."], True)
+    return ["config %s: %s%s" % (f, v if v != "" else EMPTY_CONFIG.get(f, v), " (default)" if d else "")
+            for f, (v, d) in config.items()], [], False
+
+
+# What an empty Config value means, printed in its place.
+EMPTY_CONFIG = {"conversation_language": "empty, the language the user writes in"}
+
+
+# ---- Mode state ----
+
+# The skill link of each agent SETUP.md step 4 lists, under the home folder
+SKILL_LINKS = {"claude": ".claude/skills/career-log", "codex": ".agents/skills/career-log",
+               "antigravity-app": ".gemini/config/skills/career-log",
+               "antigravity-cli": ".gemini/antigravity-cli/skills/career-log"}
+INBOX_LINES = ["sources/inbox/*", "!sources/inbox/.gitkeep"]   # raw chat exports stay out of git (a guard file)
+PROFILE_STEP = "next: when a step would read an interviewer's profile shown only to signed-in members, first: "
+
+
+def same_path(a, b):
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def direction_state(ctx):
+    """`direction <item>: set|empty|unreadable (<why>)`, one per Direction item, from config.py show's lines."""
+    config_tool = tools_module("config")
+    lines = config_tool.direction_lines(ctx.root)
+    out = []
+    for item in config_tool.DIRECTION_LINES:
+        mine = [l[len("direction %s: " % item):] for l in lines if l.startswith("direction %s: " % item)]
+        state = "empty" if mine == ["empty"] else mine[0] if mine and mine[0].startswith("unreadable") else "set"
+        out.append("direction %s: %s" % (item, state))
+    return out
+
+
+def eol_state(root):
+    """setup's `eol:` line: SETUP.md step 2's check of the line ends git wrote."""
+    out = git_out(root, "ls-files", "--eol")
+    if out is None:
+        return "eol: unknown (git ls-files failed)"
+    wrong = []
+    for line in out.splitlines():
+        fields, _, path = line.partition("	")
+        work = next((f for f in fields.split() if f.startswith("w/")), "")
+        want = "w/crlf" if "eol=crlf" in fields.split() else "w/lf"   # .gitattributes: *.ps1 and *.bat CRLF
+        if work not in (want, "w/", "w/none", "w/-text"):   # w/: deleted from the working tree
+            wrong.append("%s %s" % (path, work))
+    if not wrong:
+        return "eol: ok"
+    return "eol: wrong (%s%s; SETUP.md step 2)" % (", ".join(wrong[:5]), " and %d more" % (len(wrong) - 5) if len(wrong) > 5 else "")
+
+
+def skill_link_lines(ctx):
+    """setup's `skill link <agent>:` lines, one per row of SETUP.md step 4."""
+    skill = os.path.join(ctx.root, "skills", "career-log")
+    out = []
+    for agent, rel in SKILL_LINKS.items():
+        link = os.path.join(ctx.home, *rel.split("/"))
+        if not os.path.lexists(link):
+            out.append("skill link %s: missing (%s; only an agent the user runs needs it, made as SETUP.md step 4"
+                       " says)" % (agent, link))
+        elif not os.path.exists(link):
+            out.append("skill link %s: broken (%s leads to %s, which is gone)" % (agent, link, os.path.realpath(link)))
+        elif same_path(link, skill):
+            out.append("skill link %s: ok (%s)" % (agent, link))
+        else:
+            out.append("skill link %s: elsewhere (%s leads to %s)" % (agent, link, os.path.realpath(link)))
+    return out
+
+
+def inbox_state(ctx):
+    """import's `gitignore inbox:` line, and the step that adds the lines .gitignore lacks."""
+    try:
+        with open(os.path.join(ctx.root, ".gitignore"), encoding="utf-8-sig") as f:
+            have = {l.strip() for l in f}
+    except FileNotFoundError:
+        have = set()
+    except (OSError, UnicodeDecodeError) as e:
+        return (["gitignore inbox: unreadable (%s)" % e],
+                ["next: now, first: tell the user that .gitignore cannot be read (%s), and put nothing in"
+                 " sources/inbox/ until it reads and holds %s." % (e, " and ".join("`%s`" % l for l in INBOX_LINES))])
+    found = ignored(ctx.root, ["sources/inbox/probe", "sources/inbox/.gitkeep"])
+    if found is None:   # git cannot tell: the lines themselves
+        lacking = [l for l in INBOX_LINES if l not in have]
+    else:   # an equal rule in other words counts too
+        lacking = (([] if "sources/inbox/probe" in found else [INBOX_LINES[0]])
+                   + ([INBOX_LINES[1]] if "sources/inbox/.gitkeep" in found else []))
+    if not lacking:
+        return ["gitignore inbox: ok"], []
+    return (["gitignore inbox: missing (%s)" % ", ".join(lacking)],
+            ["next: now, first: add the line(s) %s to %s, then run `%s commit \"gitignore: sources/inbox\" --"
+             " .gitignore`, before anything is put in sources/inbox/: the raw exports there stay out of git"
+             " (skills/career-log/engine-changes.md › Exceptions, guard files)." % (", ".join("`%s`" % l for l in lacking),
+                                                        os.path.join(ctx.root, ".gitignore"), tool_cmd(ctx.root, "sync.py"))])
+
+
+def profile_step(config):
+    """interview's step for a profile shown only to signed-in members, from interviewer_profiles."""
+    if config["interviewer_profiles"][0] == "always":
+        return (PROFILE_STEP + "read it through the signed-in profile (browser.md › Sign-in):"
+                " config.toml's interviewer_profiles is \"always\".")
+    return (PROFILE_STEP + "keep to public pages and search results, with a `GAP:` for what they do not show,"
+            " and make that `GAP:` the report's last word on the profile. Say once that"
+            " `interviewer_profiles = \"never\"` in config.toml is why, and that the user changes it by saying so"
+            " (setup › Changes).")
+
+
+def check_mode_state(ctx):
+    """The state lines one mode reads: Direction items in every mode; setup's front page, line ends and
+    skill links; import's inbox lines in .gitignore; scan's windows; interview's profile step."""
+    config_tool = tools_module("config")
+    try:
+        config = config_tool.load(ctx.root)
+    except config_tool.ConfigError:
+        config = None   # check_config has stopped the run, but in setup
+    lines, nexts = direction_state(ctx), []
+    if ctx.mode == "setup":
+        try:
+            lines.append("front page: %s" % config_tool.front_page_state(ctx.root))
+        except config_tool.ConfigError as e:
+            lines.append("front page: unreadable (%s)" % e)
+        lines.append(eol_state(ctx.root))
+        lines += skill_link_lines(ctx)
+    elif ctx.mode == "import":
+        il, nexts = inbox_state(ctx)
+        lines += il
+    elif ctx.mode == "scan" and config:
+        window, scheduled = config["window"][0], config["scheduled_window"][0]
+        scheduled = window if scheduled == "window" else scheduled
+        lines.append("scan window: %s days (window); %s days in an unattended run (scheduled_window)" % (window, scheduled))
+    elif ctx.mode == "interview" and config:
+        nexts.append(profile_step(config))
+    return lines, nexts, False
+
+
+# ---- Entry size ----
+
+def check_size(ctx):
+    """One line per entry past tools/entries.py's threshold; never stops the mode."""
+    entries = tools_module("entries")
+    try:
+        return entries.over_threshold(entries.load(ctx.root)), [], False
+    except (OSError, UnicodeDecodeError):
+        return [], [], False
+
+
+# ---- Newer Template release ----
+
+RELEASES_URL = os.environ.get("CAREER_LOG_RELEASES_URL")   # None: the Template tools/upgrade.py fetches
+RELEASE_TIMEOUT = 2   # seconds, for the whole request, name lookup included
+RELEASE_EVERY = 24 * 3600
+
+
+def latest_release(url):
+    """The newest release's version from a Releases API URL, or None when it cannot be had in time."""
+    import threading
+    import urllib.request
+    found = []
+
+    def fetch():
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=RELEASE_TIMEOUT) as r:
+                tag = json.loads(r.read(1 << 20)).get("tag_name")
+            found.append(tag[1:] if isinstance(tag, str) and tag.startswith("v") else tag)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=fetch, daemon=True)
+    t.start()
+    t.join(RELEASE_TIMEOUT)
+    return found[0] if found and isinstance(found[0], str) else None
+
+
+def release_cache(ctx):
+    return os.path.join(ctx.home, ".career-log", "release.json")
+
+
+def cached_release(ctx, now):
+    """The newest release known from the last day: (True, version or None), or (False, None) to ask."""
+    try:
+        with open(release_cache(ctx), encoding="utf-8") as f:
+            cache = json.load(f)
+        latest = cache["latest"]
+        if 0 <= now - cache["checked"] < RELEASE_EVERY and (latest is None or isinstance(latest, str)):
+            return True, latest   # None: the last ask failed (offline, rate-limited); ask again tomorrow
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return False, None
+
+
+def check_release(ctx):
+    """An `update:` line when a newer Template release than tools/TEMPLATE_VERSION's exists; never stops."""
+    try:
+        config = tools_module("config").load(ctx.root) or {}
+        if UNATTENDED or config.get("update_check", ("on",))[0] != "on":
+            return [], [], False
+        upgrade = tools_module("upgrade")
+        have = upgrade.stamped(ctx.root)[0]
+        if not have or not upgrade.SEMVER.match(have):   # no stamp, or `next`: an unreleased export
+            return [], [], False
+        now = time.time()
+        known, latest = cached_release(ctx, now)
+        if not known:
+            repo = upgrade.URL.removeprefix("https://github.com/").removesuffix(".git")
+            latest = latest_release(RELEASES_URL or "https://api.github.com/repos/%s/releases/latest" % repo)
+            path = release_cache(ctx)
+            own = "%s.%d" % (path, os.getpid())
+            try:   # through a file of its own, so a session running the check at the same time reads a whole one
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(own, "w", encoding="utf-8") as f:
+                    json.dump({"checked": now, "latest": latest}, f)
+                os.replace(own, path)
+            except OSError:   # on Windows, another session holding release.json open
+                try:
+                    os.remove(own)
+                except OSError:
+                    pass
+        if latest and upgrade.SEMVER.match(latest) and upgrade.key(latest) > upgrade.key(have):
+            return (["update: v%s available (you have v%s): tell the user once this session, in passing, and go"
+                     " on; only their request (\"upgrade\") starts the upgrade mode, and `update_check = \"off\"` in"
+                     " config.toml stops this line (setup › Changes)" % (latest, have)], [], False)
+    except Exception:
+        pass
+    return [], [], False
+
+
+# ---- Session hygiene ----
+
+FRESH = "Start a new session (or `/clear`) first: everything this session did is in the Log."
+# In place of FRESH when no Next line applies (#607)
+COMPLETE = ("Complete: this run did what it had to, and no next step follows from it. The session can end; start"
+            " a new session for any other need.")
+# Files the Log's mode commits keep beside LOG_PATHS (which holds stories/): the guard files
+# (SKILL.md › Commits)
+SAVED_TOO = [".export-deny", ".export-cleared"]
+
+
+def unconsolidated(root):
+    """The entries whose status (their front matter's `status:`) is `stub` or `imported`."""
+    return [e for e in tools_module("entries").load(root) if re.match(r"(stub|imported)\b", e.status)]
+
+
+def consolidated(root):
+    """True when no entry's status is `stub` or `imported`."""
+    return not unconsolidated(root)
+
+
+# A step of the first-use flow is done, and skipped, when the Log's state says so. The inbox is no
+# sign: import-chats leaves its raw exports there for the user to move.
+DONE = {"import": lambda root: bool(tools_module("entries").load(root)), "consolidate": consolidated,
+        "stories": lambda root: bool(tools_module("entries").talking_points_files(root))}
+
+
+def git_out(root, *args):
+    """git's stdout, with its last newline taken off, or None when git fails; its warnings on stderr
+    are left out."""
+    try:
+        p = subprocess.run(["git", "-C", root] + list(args), capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return p.stdout.rstrip("\n") if p.returncode == 0 else None
+
+
+class Guide:
+    """The flows table and SKILL.md › Modes, read through tools/guide.py; `error` when they cannot be."""
+
+    def __init__(self, root):
+        self.flows, self.modes, self.error = [], {}, None
+        try:
+            guide = tools_module("guide")
+            self.flows = guide.flows(root)
+            header, rows = guide.table(guide.read(os.path.join(root, *guide.SKILL_MD.split("/"))), "Modes")
+        except Exception as e:   # GuideError, OSError: the block goes on without the guide
+            self.error = str(e)
+            return
+        col = {h.lower(): i for i, h in enumerate(header)}
+        cell = lambda r, name: r[col[name]] if name in col and col[name] < len(r) else ""
+        for r in rows:
+            examples = re.findall(r'"([^"]+)"', cell(r, "for example"))
+            name = r[0].strip("* ")
+            if name == "guide":   # the guide's request for where to go from here
+                examples = [e for e in examples if "next" in e] + examples
+            self.modes[name] = {"example": examples[0] if examples else None, "file": cell(r, "file")}
+
+    def parent(self, mode):
+        """The SKILL.md › Modes row a mode runs under: its own, or the one whose File links modes/<mode>.md."""
+        if mode in self.modes:
+            return mode
+        return next((m for m, v in self.modes.items() if "modes/%s.md" % mode in v["file"]), mode)
+
+    def step(self, mode):
+        """The first flows row of a mode, or None."""
+        return next((r for r in self.flows if r["mode"] == mode), None)
+
+    def said(self, mode, example=True):
+        """`<mode>` (say "<its example>"), or `<mode>` alone with no example (or example=False)."""
+        example = example and self.modes.get(mode, {}).get("example")
+        return '`%s` (say "%s")' % (mode, example) if example else "`%s`" % mode
+
+
+def check_session(ctx):
+    """The mode start line and the fresh-session suggestion; nothing for log or an unattended run."""
+    if ctx.mode == "log" or UNATTENDED:
+        return [], [], False
+    guide = Guide(ctx.root)
+    same = sorted({r["mode"] for r in guide.flows if r["session"] == "same" and guide.parent(r["next"]) == ctx.mode})
+    head = git_out(ctx.root, "rev-parse", "--short", "HEAD")
+    lines = (["mode start: %s@%d (Next up's --since; on a rerun of this mode's check, keep the first one)"
+              % (head, int(time.time()))] if head else [])
+    nexts = ["next: now, first: on any rerun of this check within this run of %s, skip this line: it is for the"
+             " mode's first check. At the first check: if this session already ran a career-log mode before this"
+             " run started, an earlier run of %s included, suggest that the user start a new session (or `/clear`)"
+             " for %s, saying why in one line: a session that fills up writes worse, and the Log and git already"
+             " hold what the earlier mode saved. Then wait for their answer: for a new session, stop here; if they"
+             " stay, go on here. Not counted: log, guide, a setup this request's Trigger check started%s."
+             % (ctx.mode, ctx.mode, ctx.mode, ", and %s, whose flow the guide goes on with in the same session"
+                % ", ".join(same) if same else "")]
+    return lines, nexts, False
+
+
+def saved_lines(root, since):
+    """The commits made since `mode start`: those in <sha>..HEAD committed at or after <time>."""
+    if not since:
+        return ["Saved: not listed (no --since)"]
+    sha, _, at = since.partition("@")
+    out = git_out(root, "log", "--no-show-signature", "--format=%ct %s", "%s..HEAD" % sha)
+    if out is None or not at.isdigit():
+        return ["Saved: not listed (%s is not a `mode start` value of this Log)" % since]
+    commits = []
+    for line in out.splitlines():
+        stamp, _, rest = line.partition(" ")
+        if stamp.isdigit() and int(stamp) >= int(at):
+            commits.append(rest)
+    if not commits:
+        return ["Saved: no commit (this mode changed nothing in the Log)"]
+    shown = ["  " + c for c in commits[:10]] + (["  ... and %d more" % (len(commits) - 10)] if len(commits) > 10 else [])
+    head = "1 commit; its subject:" if len(commits) == 1 else "%d commits; their subjects:" % len(commits)
+    return ["Saved: " + head] + shown
+
+
+def unsaved(ctx):
+    """What keeps the Log from holding everything: uncommitted Log files (this session's and those no session
+    is writing), commits not on origin."""
+    files = ["%s %s" % (status, path) for kind, status, path, _ in log_files(ctx) or [] if kind in ("left", "own")]
+    extra = git_out(ctx.root, "-c", "core.quotepath=false", "status", "--porcelain", "-z", "--untracked-files=all",
+                    "--", *SAVED_TOO)
+    files += [e[:2].strip() + " " + e[3:] for e in (extra or "").split("\0") if len(e) > 3]
+    ahead = git_out(ctx.root, "rev-list", "--count", "@{upstream}..HEAD")
+    if ahead is None:   # no upstream: compare with origin's default branch
+        default = git_out(ctx.root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+        ahead = git_out(ctx.root, "rev-list", "--count", "%s..HEAD" % default) if default else None
+    out = []
+    if files:
+        out.append("%d Log file(s) not committed (%s)" % (len(files), ", ".join(files)))
+    if ahead and ahead.isdigit() and ahead != "0":
+        out.append("%s commit(s) not pushed%s" % (ahead, PUSHES if pushable(ctx.root) else ""))
+    return out
+
+
+PUSHES = " (`sync.py push` pushes them)"
+
+
+def pushable(root):
+    """Whether HEAD is on a branch sync.py pushes from: origin's default one, or a scan draft branch."""
+    current = git_out(root, "symbolic-ref", "--short", "-q", "HEAD")
+    default = git_out(root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    return bool(current) and (current.startswith("scan/") or "origin/%s" % current == default)
+
+
+# Why a step comes again when the Log's state says its work is not done yet. An import answered No
+# leaves no entries; the steps after it, which read entries, are not done but cannot start.
+AGAIN = {"consolidate": "They still have gaps and pending notes",
+         "import": "The Log has no entries yet: the import was undone, or found nothing to keep"}
+# The steps that read entries: on a Log with none, import comes first, whichever mode ran (#424)
+READS_ENTRIES = ("consolidate", "stories", "fit", "write", "interview")
+NO_ENTRIES = ("The Log has no entries yet, and the later steps read them: import your old resumes, exports and chat"
+              " histories first")
+# A step that acts on something the Log cannot name is offered only right after the modes that
+# leave it one: fit, the postings scan-results kept; write, the posting fit just checked.
+# interview waits for an application to turn into an interview, which no run sees (#607).
+NEEDS_TARGET = {"fit": ("scan-results",), "write": ("fit",), "interview": ()}
+NAMED = 3   # the entries a Next line names; the rest it counts
+
+
+def target(root, step):
+    """What a Next of <step> acts on in this Log, the start of its reason; "" when <step> acts on no
+    part of the Log it can name."""
+    if step != "consolidate":
+        return ""
+    left = unconsolidated(root)
+    names = ["%s (%s)" % (tools_module("entries").one_value(e.fields.get("title")) or e.slug, e.path)
+             for e in left[:NAMED]]
+    more = " and %d more" % (len(left) - NAMED) if len(left) > NAMED else ""
+    return "%s still `stub` or `imported`: %s%s" % ("1 entry is" if len(left) == 1 else "%d entries are" % len(left),
+                                                     ", ".join(names), more)
+
+
+def entry_titles(root):
+    """{entry path: its title on one line, or its slug}."""
+    app, entries = tools_module("application"), tools_module("entries")
+    return {e.path: app.one_line(entries.one_value(e.fields.get("title"))) or e.slug for e in entries.load(root)}
+
+
+STALE_AT = 3   # a Target version's stale count that gets a Next line, on the run that crosses it (#612)
+
+
+def stale_nexts(root, guide, base, example=True):
+    """A Next line for each Target version whose stale count (its two staleness lists added together,
+    tools/application.py stale) is STALE_AT or more now and was below it at commit <base>, the run's
+    start: it appears once, on the run that crosses, with no stored state. None when <base> is None.
+    example=False leaves out audit's English request to say, for a sentence the agent words itself."""
+    if base is None:
+        return []
+    app = tools_module("application")
+    titles = entry_titles(root)
+    held = set((git_out(root, "ls-tree", "-r", "-z", "--name-only", base, "--", "entries/") or "").split("\0"))
+    said = guide.said("audit", example)
+    out = []
+    for name in logfiles.targets(root):
+        try:
+            res = app.stale(root, name)
+        except app.AppError:
+            continue
+        if not res or git_out(root, "merge-base", "--is-ancestor", res["saved"][0], base) is None:
+            continue   # not saved, saved during this run, or <base> is not in this Log: nothing to compare
+        since_save = "%s..%s" % (res["saved"][0], base)
+        # (entry, how it is behind, whether it already was at <base>)
+        behind = [(path, "changed", bool(git_out(root, "log", "-1", "--format=%h", since_save, "--", path)))
+                  for path, _, _ in res["changed"]]
+        behind += [(path, "new", path in held and not untracked) for path, _, untracked in res["new"]]
+        if not len(behind) >= STALE_AT > sum(was for *_, was in behind):
+            continue
+        out.append("Next: %s. Target version `%s` has %d entries behind its last save: %s. It decides whether to"
+                   " refresh the Target version." % (said, name, len(behind), ", ".join(
+                       "%s (%s, %s)" % (titles.get(path, path), path, how) for path, how, _ in behind)))
+    return out
+
+
+def added_phrasings(root, base, cite):
+    """(wording, entry path) for each ## Past phrasings line added since commit <base> that cites <cite>."""
+    diff = git_out(root, "-c", "core.quotepath=false", "diff", "-U0", "--no-color", "%s..HEAD" % base, "--", "entries/")
+    out, path, header = [], None, False
+    for line in (diff or "").splitlines():
+        if line.startswith("diff --git "):
+            path, header = None, True
+        elif header and line.startswith("+++ "):   # the file's header, not an added line
+            path, header = (line[6:] if line.startswith("+++ b/") else None), False
+        elif line.startswith("+") and path:
+            m = tools_module("entries").PHRASING_PARTS.fullmatch(line[1:].strip())
+            if m and tools_module("check_save").cites(m.group(3), cite):
+                out.append((m.group(2), path))
+    return out
+
+
+def feed_nexts(root, base):
+    """After a posting run's Reference save since commit <base>, the Next lines that feed it back
+    (#614): Update, the bullets it added to Past phrasings that its role family's Target version
+    lacks (each below entries.py's SIMILAR to all of that version's bullets); Create, when that
+    family has no Target version yet; Direction, when the role is not among the Target roles. The
+    family and the role's tier are the ones `application.py start` recorded in the draft folder; a
+    record that lacks one of its lines gets a `Not read:` line in their place. None for an Archived
+    save, without that record, or when <base> is None."""
+    if base is None:
+        return []
+    app, entries, check_save = tools_module("application"), tools_module("entries"), tools_module("check_save")
+    added = git_out(root, "-c", "core.quotepath=false", "diff", "--name-only", "--diff-filter=A", "%s..HEAD" % base,
+                    "--", app.APPLICATIONS + "/")
+    titles = None
+    out = []
+    for name in sorted({p.split("/")[2] for p in (added or "").splitlines() if p.count("/") >= 3}):
+        rel = "%s/%s" % (app.APPLICATIONS, name)
+        rec = logfiles.start_record(root, name)
+        if rec is None or logfiles.is_archived_folder(root, rel):
+            continue
+        if logfiles.start_record_lacks(rec):
+            out.append("Not read: %s lacks %s (application.py start --family --tier writes it), so %s gets no"
+                       " Target version or Direction offer." % (logfiles.START_RECORD % name,
+                                                                ", ".join(logfiles.start_record_lacks(rec)), rel))
+            continue
+        subject = git_out(root, "log", "--format=%s", "--reverse", "%s..HEAD" % base, "--", rel) or ""
+        role = next((m[1] for m in map(check_save.parse_write_subject, subject.splitlines()) if m), name)
+        family = rec["family"]
+        if family in logfiles.targets(root):
+            have = [(None, app.wording(i)) for _, i in logfiles.tex_bullets(
+                app.read(root, "%s/%s.tex" % (logfiles.RESUMES, family)))]
+            new = [(w, path) for w, path in added_phrasings(root, base, rel)
+                   if all(entries.similar((None, w), h) < entries.SIMILAR for h in have)]
+            if new:
+                titles = titles or entry_titles(root)
+                out.append('Next: `write` (say "update my %s resume with the new bullets"). Target version `%s` lacks'
+                           ' %s this save added to Past phrasings: %s. A target run for `%s` decides which'
+                           ' to bring in.' % (family, family, logfiles.plural(len(new), "bullet"), ", ".join(
+                               '"%s" (%s, %s)' % (w, titles.get(path, path), path) for w, path in new), family))
+        elif family != "general" or not tools_module("config").target_roles(root):
+            out.append('Next: `write` (say "make my first %s resume from the %s application"). No Target version is'
+                       ' close to this role (this run started from %s): a target run creates `%s`, seeded from this'
+                       ' application\'s approved resume (%s/resume.tex), which it generalises (it drops the posting\'s'
+                       ' own terms and company emphasis) and reviews on its own.'
+                       % (family, name, rec["from"], family, rel))
+        if rec["tier"] == "none":
+            out.append('Next: `setup` (say "add %s to my target roles"). %s is not among Direction\'s target roles,'
+                       ' and `rank`, `scan` and `fit` order by that list.' % (role, role))
+    return out
+
+
+def rank_nexts(root, family):
+    """After rank (#615): a Next line for a target run when the top target role (direction.md's first
+    one) has no Target version, the resume handed out where there is no posting. <family> is that
+    role's family's target name, as application.py start's --family names it; None while
+    outputs/resumes/ holds no Target version. None when the target roles are empty."""
+    role = tools_module("config").top_role(root)
+    if not role or family in logfiles.targets(root):
+        return []
+    role = tools_module("config").role_name(role)
+    return ['Next: `write` (say "make a %s resume"). Your top target role, %s, has no Target version, and it is'
+            ' what you hand out where there is no posting, as at this ranking\'s event: a target run creates one.'
+            % (role, role)]
+
+
+def relevant_also(root, mode, nexts):
+    """The modes outside the flows that this Log's state calls for and no Next line covers, as
+    (mode, why); none otherwise. rank and guide wait for the user's own request."""
+    left = len(unconsolidated(root))
+    if mode != "audit" and left > 1 and not any(n.startswith(("Next: `consolidate`", "Next: `audit`")) for n in nexts):
+        return [("audit", "%d entries are still `stub` or `imported`; it ranks which to consolidate first" % left)]
+    return []
+
+
+def next_step(guide, mode, root):
+    """The flows row whose Next is the step for this Log's state: this mode again while its own work
+    is not done (AGAIN), else its Next, walking past steps already done; import when that Next reads
+    entries and the Log has none; None when that Next has nothing to act on here (NEEDS_TARGET)."""
+    if mode in AGAIN and not DONE[mode](root):
+        return {"mode": mode, "next": mode, "why": AGAIN[mode], "session": "new"}
+    row, seen = guide.step(mode), set()
+    while row and row["next"] in DONE and row["next"] not in seen and DONE[row["next"]](root):
+        seen.add(row["next"])
+        after = guide.step(row["next"])
+        if not after:
+            break
+        row = dict(after, session="new")
+    if row and row["next"] in READS_ENTRIES and not DONE["import"](root):
+        return {"mode": mode, "next": "import", "why": NO_ENTRIES, "session": "new"}
+    if row and mode not in NEEDS_TARGET.get(row["next"], (mode,)):
+        return None
+    return row
+
+
+def done(argv, root=ROOT):
+    """`done <mode> [--session <key>] [--since <sha>@<time>] [--for <mode>] [--no-posting] [--family <target>]`:
+    the Next up block; (exit code, lines). With --session, once the block exits 0, releases every claim of that
+    session (ADR 0014), whose record stays: the session goes on idle, with its key. On exit 1 (its own files not
+    saved) the claims stay, so no other session is offered those files while it settles them."""
+    args, session = list(argv), None
+    if "--session" in args:
+        i = args.index("--session")
+        session = args[i + 1] if i + 1 < len(args) else ""
+        del args[i:i + 2]
+        if not logfiles.SESSION_KEY.match(session):
+            return 2, ["usage: --session needs the key the Trigger check's `session:` line printed"]
+    code, out = next_up(args, root, session)
+    if session and code == 0 and logfiles.read_session(root, session) is not None:
+        logfiles.release_claims(root, session)
+    return code, out
+
+
+def next_up(argv, root, session):
+    """done's block, before it releases the session's claims."""
+    opts, args = {}, list(argv)
+    no_posting = "--no-posting" in args
+    args = [a for a in args if a != "--no-posting"]
+    for flag in ("--since", "--for", "--family"):
+        if flag in args:
+            i = args.index(flag)
+            if i + 1 >= len(args):
+                return 2, ["usage: %s needs a value" % flag]
+            opts[flag] = args[i + 1]
+            del args[i:i + 2]
+    guide = Guide(root)
+    known = set(MODES) | set(guide.modes) | {r["mode"] for r in guide.flows}
+    if (len(args) != 1 or args[0] not in known
+            or ("--for" in opts and (args[0] != "setup" or opts["--for"] not in MODES))
+            or (no_posting and args[0] != "fit")
+            or ("--family" in opts and (args[0] != "rank" or not logfiles.is_target_name(opts["--family"])))):
+        return 2, ["usage: %s -I tools/check.py done <mode> [--session <key>] [--since <sha>@<time>] [--for <mode>] [--no-posting]"
+                   " [--family <target>] (--for with setup only, --no-posting with fit only, --family with rank"
+                   " only, a lowercase target name); <mode> is one of %s" % (python_cmd(), ", ".join(sorted(known)))]
+    mode = args[0]
+    if UNATTENDED:
+        return 0, []
+    versions = logfiles.targets(root) if mode == "rank" else []
+    if versions and "--family" not in opts and tools_module("config").target_roles(root):
+        return 2, ["usage: done rank needs --family <target>, the Target version of your first target role's family"
+                   " (or the name a target run for it would take), while outputs/resumes/ holds one: %s"
+                   % ", ".join(versions)]
+    since = opts.get("--since", "").partition("@")[0] or None
+    if mode == "log":   # no block: only a Target version's stale line, from log's last commit (step 4's)
+        # no English request to say (#624): an example to copy kept it in English in a non-English conversation
+        lines = stale_nexts(root, guide, since or "HEAD~1", example=False)
+        return 0, lines + ["next: add it to the one-line report (log's step 5) as one sentence, every word of it in"
+                           " the user's language: write the request the user can say to start audit in their"
+                           " language too, with no English words in it, and name the mode beside it as `audit`,"
+                           " in code"] if lines else []
+    out = ["Close-out"] + saved_lines(root, opts.get("--since"))
+    missing = unsaved(Context(mode, root=root, session=session))
+    if "--for" in opts:
+        out.append("Next: go back to `%s` in this session: setup ran for that request." % opts["--for"])
+        if missing:
+            out.append("Not saved yet: %s. Save it before you go on." % "; ".join(missing))
+    else:
+        # One Next line per step that applies now, naming what it acts on; never the work just saved
+        nexts = []
+        row = None if no_posting else next_step(guide, mode, root)   # its Next follows from a posting's fit
+        if row and row["next"] == "-":
+            row = None   # the flow's last step: like no fixed step, no Next line (#549)
+        if guide.error:
+            nexts.append("Next: not found (docs/guide.md: %s)." % guide.error)
+        elif row:
+            why = [w[:1].upper() + w[1:] for w in (target(root, row["next"]), row["why"].rstrip(".")) if w]
+            nexts.append("Next: %s. %s." % (guide.said(row["next"]), ". ".join(why)))
+        if mode == "consolidate":
+            nexts += stale_nexts(root, guide, since)
+        elif mode == "write":
+            nexts += feed_nexts(root, since)
+        elif mode == "rank":
+            nexts += rank_nexts(root, opts.get("--family"))
+        out += nexts
+        also = relevant_also(root, mode, nexts)
+        if missing:
+            out.append("Not saved yet: %s. Save it before you leave this session." % "; ".join(missing))
+        elif row and row["session"] == "same":
+            out.append("Go on in this session: the guide runs `%s` right after `%s`, in the same session."
+                       % (row["next"], mode))
+        else:
+            out.append(FRESH if nexts or also else COMPLETE)
+        if also:
+            out.append("Also available: " + "; ".join("%s: %s" % (guide.said(m), why) for m, why in also))
+    show = ("end your last message with the block above, nothing after it" if "--for" not in opts else
+            "show the user the block above, then go on with %s, starting with its Trigger check" % opts["--for"])
+    as_printed = ", rendered as SKILL.md › Next up says: its Saved line included, its requests to say translated."
+    if missing:
+        push = ""
+        if any(m.endswith(PUSHES) for m in missing):   # no other command only pushes
+            push = (" (commits not pushed: `%s push`; in the upgrade mode before its step 5, leave them: that"
+                    " push waits for the user's yes)" % tool_cmd(root, "sync.py"))
+        out.append("next: now, first: settle what is not saved, as SKILL.md › Commits says%s, then run this"
+                   " command again. When it cannot be settled (a push that fails), say what failed and %s, as"
+                   " it stands%s" % (push, show, as_printed))
+        return 1, out
+    out.append("next: %s%s" % (show, as_printed))
+    return 0, out
+
+
+CHECKS = [check_python, check_session_key, check_session, check_uncommitted, check_git, check_config, check_mode_state, check_size,
+          check_release, check_tools, check_pull]
+BROWSER_CHECKS = [check_python, check_tools]   # `browser`: playwright-cli's state alone
+
+
+def main(argv):
+    if hasattr(sys.stdout, "reconfigure"):   # Log file names in any language, whatever the code page
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    if "-h" in argv or "--help" in argv:
+        print(__doc__.rstrip())
+        return 0
+    try:
+        root, argv = logfiles.split_root(argv, os.path.join(HERE, "check.py"))
+    except logfiles.LogError as e:
+        print("usage: %s" % e)
+        return 2
+    root = os.path.realpath(root)
+    if argv[:1] == ["done"]:
+        code, out = done(argv[1:], root=root)
+        for line in out:
+            print(line)
+        return code
+    session = None
+    if "--session" in argv:
+        i = argv.index("--session")
+        session = argv[i + 1] if i + 1 < len(argv) else ""
+        argv = argv[:i] + argv[i + 2:]
+    if (len(argv) != 1 or argv[0] not in MODES + ["browser"] or session == ""
+            or (session is not None and (argv[0] == "browser" or not logfiles.SESSION_KEY.match(session)))):
+        print("usage: %s -I tools/check.py <mode> [--session <key>] [--root <root>]; <mode> is one of %s, or browser"
+              " (which takes no --session); <key> is the one this session's first check printed on its `session:`"
+              " line" % (python_cmd(), ", ".join(MODES)))
+        return 2
+    resume_module().no_error_dialogs()   # for every program the checks start, not only poppler
+    ctx = Context(argv[0], root=root, session=session)
+    print("root: %s" % ctx.root)
+    lines, nexts, stopped = [], [], False
+    for check in BROWSER_CHECKS if ctx.mode == "browser" else CHECKS:
+        cl, cn, stop = check(ctx)
+        lines += cl
+        nexts += cn
+        if stop:
+            stopped = True
+            break
+    for line in lines + nexts:
+        print(line)
+    if stopped:
+        return 1
+    if not any(n.startswith("next: now") and "run this check again" in n for n in nexts):
+        print("next: go on with the mode")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
