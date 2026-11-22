@@ -37,7 +37,7 @@ or unreadable (`FAIL: ...`), 2 on a usage error.
 It is the maintainer's guard only: a contributor without the list does not install it.
 Standard library only, Python 3.11+.
 """
-import os, re, subprocess, sys
+import os, posixpath, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))   # -I leaves it off sys.path
@@ -179,7 +179,7 @@ def scan(lists, revisions):
                 found.append("%s: file name %s" % (where, path))
         # A licence left out before `seen`, so the same contents in any other file are still read
         new = [(path, oid) for path, oid in files
-               if oid not in seen and path.rsplit("/", 1)[-1] != LICENCE]
+               if oid not in seen and posixpath.basename(path) != LICENCE]
         seen.update(oid for _, oid in new)
         contents = blobs([oid for _, oid in new]) if new else {}
         for path, oid in new:
