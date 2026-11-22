@@ -9,8 +9,9 @@ holds exports only, and tagged v<next version>-dev.<n> (docs/publishing.md › D
 <dest>       the repository the build goes into: this repo's own checkout in CI (dev-build.yml), a
              scratch repository for a build of an unmerged commit (made with `git init` when missing).
 --releases   where the release tags vX.Y.Z live (default: the public Template); its tags and <dest>'s
-             own are read, and the highest is the latest release. Each of its release tags <dest>
-             lacks is fetched into <dest>, so a Log can upgrade from <dest> alone (`--url <dest>`).
+             own are read, and the highest is the latest release. Without --push, each of its
+             release tags <dest> lacks is fetched into <dest>, so a Log can upgrade from <dest>
+             alone (`--url <dest>`).
 --branch     the builds branch in <dest> (default `builds`). Its first commit has no parent, so it
              shares no history with any other branch; each later build's parent is the build before.
 --push       after the tag is made, push the builds branch and the tag to <remote> of <dest>, in one
@@ -22,7 +23,7 @@ else its patch (docs/publishing.md › Publishing a release). <n> is one more th
 v<next>-dev.<n> tag in <dest>, 1 when there is none, so it starts at 1 after each release. The export
 runs with --version <next>-dev.<n>, which does not refuse a next guide that holds a change and ships
 it as it stands. The build's tree is the export as it is, its file modes from the source commit. It
-writes only the builds branch, the tag and the release tags it fetches in <dest>: never its
+writes only the builds branch, the tag and the release tags it fetches into <dest>: never its
 checked-out branch or work tree, and --push sends only the branch and the Dev build's tag. The
 build's commit ends `Exported from career-log-engine <source>`, as a release's does (coord.py). Its
 commit and tag carry <dest>'s git identity (user.name, user.email); with none, it stops first.
@@ -74,14 +75,11 @@ def dev_number(tags, version):
     return max([int(m.group(1)) for m in map(want.match, tags) if m], default=0) + 1
 
 
-export = coord.export
-
-
-def bring_releases(dest, url, names, have):
-    """Fetch into dest each release tag vX.Y.Z in names (url's tags) that dest does not have, so that a
-    Log can upgrade with dest as its one --url: the plan reads the releases and the Log's own version
-    there (#19). A tag dest has already stays as it is. Returns the tags fetched."""
-    want = [n for n in names if RELEASE.match(n) and n not in have]
+def bring_releases(dest, url, url_tags, dest_tags):
+    """Fetch into dest each release tag vX.Y.Z of url that dest does not have, so that a Log can
+    upgrade with dest as its one --url: the plan reads the releases and the Log's own version there
+    (#19). A tag dest has already stays as it is. Returns the tags fetched."""
+    want = [n for n in url_tags if RELEASE.match(n) and n not in dest_tags]
     if want:
         git(dest, "-c", "maintenance.auto=false", "-c", "gc.auto=0", "fetch", "-q", "--no-tags", url,
             *("refs/tags/%s:refs/tags/%s" % (n, n) for n in want))
@@ -163,7 +161,7 @@ def build(a):
     tmp = tempfile.mkdtemp()
     try:
         out, stage = os.path.join(tmp, "export"), os.path.join(tmp, "stage")
-        export(root, version, out)
+        coord.export(root, version, out)
         tree = stage_tree(root, source, out, stage)
         carrier = git(stage, "-c", "user.name=devbuild", "-c", "user.email=devbuild@localhost",
                       "commit-tree", tree, "-m", "export")   # only carries the tree to dest
@@ -174,7 +172,9 @@ def build(a):
             "refs/heads/export")
     finally:
         rmtree(tmp)
-    brought = bring_releases(dest, url, url_tags, dest_tags)
+    # a build kept here is upgraded to from here alone; one pushed (CI's) is upgraded to from where it
+    # is pushed, with the releases from the Template, so it needs none here
+    brought = [] if a.push else bring_releases(dest, url, url_tags, dest_tags)
     message = "Dev build %s\n\n%s\n" % (version, coord.exported_from(source))
     commit = git(dest, "commit-tree", tree, *(["-p", parent] if parent else []), "-m", message)
     git(dest, "update-ref", "-m", "dev build " + version, ref, commit, parent or "")   # "": must not exist yet

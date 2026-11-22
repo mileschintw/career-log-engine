@@ -122,7 +122,7 @@ class Build(unittest.TestCase):
         self.assertEqual(rc, 0, out + err)
         want = os.path.join(self.tmp, "export")
         with redirect_stdout(io.StringIO()):
-            devbuild.export(self.src, "0.4.1-dev.1", want)
+            devbuild.coord.export(self.src, "0.4.1-dev.1", want)
         got = os.path.join(self.tmp, "got")
         os.makedirs(got)
         tar = os.path.join(self.tmp, "got.tar")
@@ -168,7 +168,7 @@ class Build(unittest.TestCase):
         self.assertIn("dev build: v0.5.0-dev.1", out)
         out = io.StringIO()
         with redirect_stdout(out), self.assertRaises(devbuild.Fail):   # a release is still refused
-            devbuild.export(self.src, "0.5.0", os.path.join(self.tmp, "rel-export"))
+            devbuild.coord.export(self.src, "0.5.0", os.path.join(self.tmp, "rel-export"))
         self.assertIn("holds a Log format change or a new setting", out.getvalue())
 
     def test_push(self):
@@ -179,6 +179,8 @@ class Build(unittest.TestCase):
         self.assertEqual(rc, 0, out + err)
         self.assertEqual(git(remote, "rev-parse", "builds"), git(self.dest, "rev-parse", "builds"))
         self.assertEqual(git(remote, "tag", "-l"), "v0.4.1-dev.1")
+        # a build that is pushed is upgraded to from there, with the Template's releases: none fetched here
+        self.assertEqual(git(self.dest, "tag", "-l"), "v0.4.1-dev.1")
 
     def test_into_a_new_repo(self):
         self.dest = os.path.join(self.tmp, "new")
@@ -238,7 +240,7 @@ class UpgradeToALocalBuild(unittest.TestCase):
         # the release: the export of the source at 0.4.0, as the Template holds it
         git(self.tmp, "init", "-q", "-b", "main", self.rel)
         with redirect_stdout(io.StringIO()):
-            devbuild.export(self.src, "0.4.0", os.path.join(self.tmp, "release"))
+            devbuild.coord.export(self.src, "0.4.0", os.path.join(self.tmp, "release"))
         shutil.copytree(os.path.join(self.tmp, "release"), self.rel, dirs_exist_ok=True)
         git(self.rel, "add", "-A", "-f")
         git(self.rel, "commit", "-q", "-m", "Release 0.4.0")
