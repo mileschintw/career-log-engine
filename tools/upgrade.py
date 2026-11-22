@@ -60,7 +60,7 @@ SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")   # a release
 # A release or a Dev build, `<next version>-dev.<n>` from 1 (tools/export-template.sh stamps the same)
 VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-dev\.([1-9]\d*))?$")
 GUIDE = "docs/upgrades/upgrade-%s.%s"
-NEXT = "next"   # a Dev build's guide: upgrade-next.*, the next release's guide as it stood
+NEXT_GUIDE = "next"   # a Dev build's guide: upgrade-next.*, the next release's guide as it stood
 # The front pages, with the heading of their entries section (tools/config.py reads above it)
 PAGES = {"README.md": "Entries", "README.zh-TW.md": "條目"}
 # logfiles.heading_re's pattern, copied: the mode runs this file alone from .build/upgrade/tools/,
@@ -72,8 +72,8 @@ class UpgradeError(Exception):
     pass
 
 
-def git(root, *args, check=True, binary=False):
-    r = subprocess.run(["git", "-C", root, *args], capture_output=True)
+def git(root, *args, check=True, binary=False, input=None):
+    r = subprocess.run(["git", "-C", root, *args], capture_output=True, input=input)
     if check and r.returncode != 0:
         raise UpgradeError("git %s: %s" % (" ".join(args), r.stderr.decode("utf-8", "replace").strip()))
     return r.stdout if binary else r.stdout.decode("utf-8", "replace")
@@ -91,7 +91,7 @@ def is_dev(version):
 
 def guide_name(version):
     """The name a version's guide has in its tree: a Dev build ships the next guide."""
-    return NEXT if is_dev(version) else version
+    return NEXT_GUIDE if is_dev(version) else version
 
 
 def ref(version):
@@ -215,8 +215,11 @@ def copy_guide(root, target, version):
 
 
 def fetch_tags(root, url, dev_url):
-    """Fetch the version tags into REFS: url's, then, when dev_url is given, the Dev builds' tags at
-    dev_url (its releases' tags stay out: releases come from url)."""
+    """Fetch the version tags into REFS, emptied first (a Dev build left by an earlier plan is no
+    release): url's, then, when dev_url is given, the Dev builds' tags at dev_url (its releases' tags
+    stay out: releases come from url)."""
+    old = "".join("delete %s\n" % r for r in git(root, "for-each-ref", "--format=%(refname)", REFS).splitlines())
+    git(root, "update-ref", "--stdin", input=old.encode())
     git(root, "fetch", "--no-tags", "--quiet", url, "+refs/tags/v*:%sv*" % REFS)
     if dev_url:
         git(root, "fetch", "--no-tags", "--quiet", dev_url, "+refs/tags/v*:%sv*" % DEV_REFS)
@@ -226,9 +229,7 @@ def fetch_tags(root, url, dev_url):
             if is_dev(name[len(DEV_REFS) + 1:]):
                 moves.append("update %s%s %s\n" % (REFS, name[len(DEV_REFS):], sha))
             moves.append("delete %s\n" % name)
-        r = subprocess.run(["git", "-C", root, "update-ref", "--stdin"], input="".join(moves).encode(), capture_output=True)
-        if r.returncode:
-            raise UpgradeError("git update-ref: %s" % r.stderr.decode("utf-8", "replace").strip())
+        git(root, "update-ref", "--stdin", input="".join(moves).encode())
     names = (r[len(REFS) + 1:] for r in git(root, "for-each-ref", "--format=%(refname)", REFS).splitlines())
     return sorted((v for v in names if VERSION.match(v)), key=key)
 
@@ -291,7 +292,7 @@ def plan(root, to=None, url=None):
     changed["dropped"] = sorted(p for p in files(root, base, paths) & files(root, "HEAD", paths)
                                 if p not in target_files)
     start = git(root, "rev-parse", "HEAD").strip()
-    save(root, {"url": url, "dev_url": dev_url, "from": version, "to": target, "start": start, "steps": steps, "done": [],
+    save(root, {"url": url, "from": version, "to": target, "start": start, "steps": steps, "done": [],
                 "gitignore": own_gitignore(root, base), **changed})
     lines += ["from: " + version, "to: " + target, "start: " + start]
     lines += ["step: " + v for v in steps]

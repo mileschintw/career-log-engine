@@ -516,6 +516,13 @@ class Upgrade(unittest.TestCase):
             self.assertEqual(out[:2], ["from: 0.3.0", "to: 0.3.2-dev.2"])
             self.assertEqual(self.steps(out), ["0.3.2-dev.2"])   # 0.3.1 has no guide
             self.assertEqual(fetched(), [self.url, eng_url])
+            self.assertEqual(upgrade.engine(log, "0.3.2-dev.2")[1][-1],   # the Engine repo's tag, checked out
+                             "guide: " + os.path.join(log, ".build", "upgrade", "upgrade-next.md").replace(os.sep, "/"))
+            self.assertEqual(upgrade.stamped(log)[0], "0.3.2-dev.2")
+            git(log, "reset", "-q", "--hard")   # back to 0.3.0
+            rc, out = upgrade.plan(log)   # a release plan after a Dev build's: no Dev ref stays behind
+            self.assertEqual(rc, 0, out)
+            self.assertNotIn("-dev.", git(log, "for-each-ref", upgrade.REFS))
             calls.clear()
             rc, out = upgrade.plan(dev_log)   # a Log on a Dev build, by default: the newest release is older
             self.assertEqual(fetched(), [self.url, eng_url])

@@ -9,12 +9,13 @@ Placeholders: `<root>` is the Log's root, `<py>` is `python3` (`py -3` on Window
 ## 1. Start, from the target release
 
 1. `git -C <root> status --short` prints nothing. When it lists files, show them to the user and ask: commit them or discard them first. The upgrade starts only from a clean tree, so the commit before it is the whole backup. Then `git -C <root> pull --ff-only`.
-2. Fetch the releases and pick the target: the newest, or the version the user named.
+2. Fetch the releases and pick the target: the newest, or the version the user named. The first line drops the refs an earlier upgrade left (a Dev build among them would sort as the newest):
    ```
+   git -C <root> for-each-ref "--format=delete %(refname)" refs/career-log-upgrade/ | git -C <root> update-ref --stdin
    git -C <root> fetch --no-tags <url> "+refs/tags/v*:refs/career-log-upgrade/v*"
    git -C <root> for-each-ref --sort=-v:refname --count=1 "--format=%(refname)" refs/career-log-upgrade/
    ```
-   The second line prints the newest release's ref (`refs/career-log-upgrade/v<version>`); for a version the user named, the ref is `refs/career-log-upgrade/v<that version>`.
+   The last line prints the newest release's ref (`refs/career-log-upgrade/v<version>`); for a version the user named, the ref is `refs/career-log-upgrade/v<that version>`.
 
    **A Dev build** is a target only when the user names one, by its version (`0.4.1-dev.3`: a build of the Engine repo between releases, on its way to `0.4.1`). Tell the user that no Dev build is promised stable, and that the newest release stays the default. The Dev builds' tags are at the Engine repo, not the Template; to list them, or to fetch the named one:
    ```
