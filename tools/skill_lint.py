@@ -29,6 +29,12 @@ installs it) and browser (browser.md's own check), are the modes whose files lin
 modes/<mode>-<part>.md counts for <mode>).
 In docs/guide.md it also fails on a generated block that is stale or missing, or a bad row of the
 flows table (`tools/guide.py check`; `tools/guide.py write` regenerates the blocks).
+It also fails on an address of the Engine repo or the Template (`<owner>/career-log-engine` and the
+same for career-log-template, after `<host>/` or `<host>:` or alone) whose owner or host is not that of
+tools/upgrade.py's DEV_URL or URL, in .github/, docs/, maintainer/, skills/, tools/ and the export's
+ALLOW list (tools/export-template.sh), `tests` folders (fixtures) left out. A literal `<owner>` passes
+as the owner; a host in MIRRORS (a site showing the GitHub repo at the same path) has only its owner
+checked; with no host, an owner right after a slash is a local path's folder, not an address.
 <root> defaults to the repo this script is in. Standard library only, Python 3.11+.
 
 There is no list of problems to ignore: a new check that finds breaks fixes them in the same pull
@@ -69,6 +75,15 @@ FIELD = re.compile(r"%(?:\([^)]*\))?[-#0 +]*(?:\d+|\*)?(?:\.\d+)?[sdifrxgc]")
 BARE_MODE = re.compile(r"(?<![\w./`-])([a-z][a-z-]*)(?= › | step \d)")
 FORMAT_FIELD = re.compile(FIELD.pattern + r"|\{[^{}]*\}|<[^<>\s]+>")
 FIELD_MARK = "\0"   # what check_tool writes in place of each field
+# An address of either repo: [host/ or host:]owner/name. With no host, an owner after a / or \ is a
+# folder of a local path (~/src/career-log-engine), not an address.
+ADDRESS = re.compile(r"(?:(?<![\w.-])(?P<host>[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)[/:]|(?<![\w./\\-]))"
+                     r"(?P<owner>[\w<][\w.<>-]*)/(?P<repo>career-log-(?:engine|template))(?![\w-])")
+ADDRESS_CONSTANTS = {"career-log-template": "URL", "career-log-engine": "DEV_URL"}   # in tools/upgrade.py
+# Where the addresses are checked: these and the export's ALLOW list (tools/export-template.sh)
+ADDRESS_PATHS = (".github", "docs", "maintainer", "skills", "tools")
+# Sites that show a GitHub repo at the same owner/name path: only their owner is checked
+MIRRORS = ("gitdiagram.com",)
 MODE_CONTEXT = [
     re.compile(r"(?:`|\*\*)([a-z][a-z-]*)(?:`|\*\*) modes?\b"),
     re.compile(r"\bmodes? (?:`|\*\*)([a-z][a-z-]*)(?:`|\*\*)"),
@@ -420,6 +435,7 @@ class Linter:
             if os.path.exists(p):
                 self.check_file(p, at=os.path.join(self.root, f))
         self.check_mode_lists()
+        self.check_addresses()
         guide_md = os.path.join(self.root, "docs", "guide.md")
         if os.path.exists(guide_md):
             self.check_file(guide_md)
@@ -427,6 +443,53 @@ class Linter:
                 self.add(os.path.join(self.root, *f.split("/")), n, msg)
         return self.problems
 
+
+    def check_addresses(self):
+        """Each address of the Engine repo or the Template in the Engine's files against the host and
+        owner of tools/upgrade.py's DEV_URL and URL (#23)."""
+        upgrade_py = os.path.join(self.root, "tools", "upgrade.py")
+        if not os.path.exists(upgrade_py):
+            return
+        literals = {}
+        for node in ast.parse(read(upgrade_py)).body:
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.value, ast.Constant)
+                    and getattr(node.targets[0], "id", None) in ADDRESS_CONSTANTS.values()):
+                literals[node.targets[0].id] = node.value.value
+        want = {}
+        for repo, name in sorted(ADDRESS_CONSTANTS.items()):
+            m = ADDRESS.search(literals.get(name) or "")
+            if not m or m.group("repo") != repo or not m.group("host"):
+                self.add(upgrade_py, 0, "no %s literal naming %s to check the repos' addresses against" % (name, repo))
+                return
+            want[repo] = (m.group("host").lower(), m.group("owner"), name)
+        paths = list(ADDRESS_PATHS)
+        export = os.path.join(self.root, "tools", "export-template.sh")
+        if os.path.exists(export):
+            m = re.search(r'^ALLOW="([^"]*)"', read(export), re.M)
+            paths += m.group(1).split() if m else []
+        files = set()
+        for rel in paths:
+            top = os.path.join(self.root, *rel.split("/"))
+            if os.path.isfile(top):
+                files.add(top)
+            for d, dirs, names in os.walk(top):
+                dirs[:] = [x for x in dirs if x != "tests"]   # tests hold fixtures with other owners
+                files.update(os.path.join(d, n) for n in names)
+        for path in sorted(files):
+            with open(path, "rb") as f:
+                data = f.read()
+            if b"\0" in data:
+                continue
+            for i, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
+                for m in ADDRESS.finditer(line):
+                    host, owner, name = want[m.group("repo")]
+                    text = "%s/%s" % ("/".join(filter(None, (m.group("host"), m.group("owner")))), m.group("repo"))
+                    if m.group("owner") != "<owner>" and m.group("owner").lower() != owner.lower():
+                        self.add(path, i, "address %s: owner %s, not %s as upgrade.%s says" % (text, m.group("owner"), owner, name))
+                    elif m.group("host") and m.group("host").lower() not in (host,) + MIRRORS:
+                        self.add(path, i, "address %s: host %s, not %s as upgrade.%s says (a site that shows the "
+                                 "GitHub repo at the same path goes in MIRRORS in tools/skill_lint.py)"
+                                 % (text, m.group("host"), host, name))
 
     def check_mode_lists(self):
         """tools/check.py's MODES and NEEDS against the modes table and the files that link browser.md."""

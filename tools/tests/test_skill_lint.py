@@ -215,6 +215,56 @@ class SkillLint(unittest.TestCase):
             (4, "modes/fit.md step 9: no such step"),
         ])
 
+    # The two repos' addresses against tools/upgrade.py's URL and DEV_URL (#23)
+    UPGRADE_PY = ('URL = "https://github.com/acme/career-log-template.git"\n'
+                  'DEV_URL = "https://github.com/acme/career-log-engine.git"\n')
+
+    def address_problems(self, files, upgrade_py=UPGRADE_PY):
+        extra = dict(files)
+        if upgrade_py is not None:
+            extra["tools/upgrade.py"] = upgrade_py
+        return [(n, msg) for n, msg in self.lint("", extra) if "address" in msg or "URL" in msg]
+
+    def test_addresses_that_match_the_constants_pass(self):
+        self.assertEqual(self.address_problems({
+            "tools/template/README.md": "[Template](https://github.com/acme/career-log-template), "
+                                        "[issues](https://github.com/ACME/career-log-engine/issues/new), "
+                                        "[diagram](https://gitdiagram.com/acme/career-log-template/video)\n",
+            "skills/career-log/modes/upgrade.md": "git fetch https://github.com/acme/career-log-engine.git\n"
+                                                 "git@github.com:acme/career-log-template.git\n",
+            "docs/publishing.md": "gh release create --repo acme/career-log-template\n"
+                                  "github.com/<owner>/career-log-engine, <owner>/career-log-template\n"
+                                  "the staging copy acme/career-log-template-staging, ~/src/career-log-engine\n",
+        }), [])
+
+    def test_a_planted_wrong_owner_fails(self):
+        self.assertEqual(self.address_problems({
+            "tools/template/README.md": "line one\n[Template](https://github.com/someone/career-log-template)\n",
+            "skills/career-log/modes/import.md": "gh issue create --repo someone/career-log-engine\n",
+            "maintainer/coord.py": 'URL = "https://gitdiagram.com/someone/career-log-template"\n',
+        }), [
+            (1, "address gitdiagram.com/someone/career-log-template: owner someone, not acme as upgrade.URL says"),
+            (1, "address someone/career-log-engine: owner someone, not acme as upgrade.DEV_URL says"),
+            (2, "address github.com/someone/career-log-template: owner someone, not acme as upgrade.URL says"),
+        ])
+
+    def test_a_planted_wrong_host_fails(self):
+        problems = self.address_problems({
+            ".github/ISSUE_TEMPLATE/config.yml": "url: https://gitlab.com/acme/career-log-engine/issues/new\n"})
+        self.assertEqual([n for n, _ in problems], [1])
+        self.assertIn("address gitlab.com/acme/career-log-engine: host gitlab.com, not github.com as upgrade.DEV_URL says",
+                      problems[0][1])
+
+    def test_tests_folders_hold_fixtures_and_are_skipped(self):
+        self.assertEqual(self.address_problems({
+            "tools/tests/fixtures/x.md": "https://github.com/someone/career-log-template\n",
+            "maintainer/tests/test_x.py": "'github.com/someone/career-log-engine'\n",
+        }), [])
+
+    def test_constants_that_name_no_address_fail(self):
+        self.assertEqual(self.address_problems({}, upgrade_py='URL = "https://github.com/acme/career-log-template"\n'),
+                         [(0, "no DEV_URL literal naming career-log-engine to check the repos' addresses against")])
+
     def test_repo_skill_passes(self):
         """The skill in this repo passes the lint as committed."""
         p = subprocess.run([sys.executable, "-I", TOOL], capture_output=True, text=True, encoding="utf-8")
