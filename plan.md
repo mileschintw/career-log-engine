@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。使用者確認了三件決定（見 `plan-history.md`），#31–#33 已開，13 個 lane session 已 archive，8 條分支已刪。第一輪已開工（merge right 見下）：九條都開了（e27、e31、e32、e22 由使用者按卡片開，分支名是 app 取的，見 Now 表）；e22 park 到 #33 merge。
+- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。使用者確認了三件決定（見 `plan-history.md`），#31–#33 已開，13 個 lane session 已 archive，8 條分支已刪。第一輪已開工（merge right 見下）。輪外：#34／PR #35（`docs/agents/issue-tracker.md` 的 Files 節）2026-11-23 由 owner 在別的 session merge，master 到 67144da。九條都開了（e27、e31、e32、e22 由使用者按卡片開，分支名是 app 取的，見 Now 表）；e22 park 到 #33 merge。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -62,6 +62,8 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | #31 `config.py set`：檔裡沒有的欄位加在檔尾、沒有註解 | 1 | none | none | `tools/config.py › set_field`、`tools/tests/test_config.py` | 第一輪 lane e31 |
 | #32 關 blank issue；#18 的 guard 測試對每個 maintainer 工具都跑 | 1 | none | none | `.github/ISSUE_TEMPLATE/config.yml`（新）、`tools/checks_for.py › GROUPS` 的 `coord` 群組、`coord-tests.yml › paths:` | 第一輪 lane e32 |
 | #33 匯出帶的檢查在 Template 和每個 Log 裡 fail（讀只在原始碼的檔） | 1 | none | none | `tools/skill_lint.py`、`tools/tests/test_skill_lint.py`、`test_logfiles.py › TableHelpers`、`test_checks_for.py › Typical`、`test_upgrade.py › Source／Export／NextGuide`、匯出用的 workflow 和它在 `checks_for.py` map 的項目 | 第一輪 lane e33 |
+| #36 checks_for.py：`prepush` 群組沒列 `tools/export-template.sh` | — | none | none | `tools/checks_for.py › GROUPS`（`prepush` 群組） | 不排 lane：e21 開的；很小，可以併進 e32（同檔不同群組）或下一輪，等使用者 |
+| #37 升級模式：Sonnet 沒等使用者 yes 就走過 step 2 的計畫 | — | none | after #27, `skills/career-log/modes/upgrade.md › step 2` | `skills/career-log/modes/upgrade.md › step 2` | 不排 lane：needs-triage，e20 開的；等使用者 |
 
 ## Waiting for the user to be present
 
@@ -69,7 +71,7 @@ none
 
 ## Waiting for the user's decision
 
-none
+- **worker 開的兩張 issue（since 2026-11-23）：** #36（e21 開的，`prepush` 群組少列 `tools/export-template.sh`）建議併進 e32（同一個 `GROUPS`、只加一行），要使用者同意改 e32 的範圍；#37（e20 開的，Sonnet 沒等 yes 就走過 step 2）needs-triage，和 e27 同一節，建議 e27 merge 後再排。
 
 ## Deadlines
 
