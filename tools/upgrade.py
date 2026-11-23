@@ -28,12 +28,16 @@ files, deletes the Engine files it no longer has unless the Log added them, and 
 own .gitignore lines back under `# This Log's own lines`. A front page (README.md, README.zh-TW.md)
 has two parts the Template writes, each checked on its own: the text above its entries heading, and
 the sections after its entries section; the entries section itself stays. A part still the old
-Template's, unedited (after the entries section: or an earlier release's), gets <version>'s text: `done: <page> above `## <heading>`: …` or `done: <page>
-after its `## <heading>` section: …`. Sections after it that the Log changed, where <version> changes
-the Template's, stay as the Log has them: `review: <page> after its `## <heading>` section: … from
-<old> to <new>`, the two files under .build/upgrade/pages/ holding the Template's old and new text
-there. It copies that version's guide and script to .build/upgrade/ (a Dev build's: upgrade-next.*,
-the next release's guide as it stood) and prints `guide: <file>`, or `guide: none`.
+Template's, unedited, gets <version>'s text (the sections after the entries section also when they
+are an earlier release's, which an older tool left there), and prints
+`done: <page> above `## <heading>`: the Template's page, unedited, now <version>'s` or
+`done: <page> after its `## <heading>` section: the Template's text, unedited, now <version>'s`.
+Sections after the entries section that the Log changed, where <version> changes the Template's,
+stay as the Log has them, and it prints `review: <page> after its `## <heading>` section: this Log's
+own text; <version> changes the Template's there, from <old> to <new>`, <old> and <new> being
+.build/upgrade/pages/old/<page> and new/<page>, the Template's text there. It copies that version's
+guide and script to .build/upgrade/ (a Dev build's: upgrade-next.*, the next release's guide as it
+stood) and prints `guide: <file>`, or `guide: none`.
 reapply: after the last step, merges the `edited:` files given (or all of them, --all) back into the
 new Engine: `git merge-file` with the Log's version at `start:`, the old Template's as the base,
 and the new one. Prints `merged:`, `conflict: <path>: <n>` (markers left in the file) or
@@ -71,7 +75,7 @@ PAGES = {"README.md": "Entries", "README.zh-TW.md": "條目"}
 # with no logfiles.py beside it (tests/test_upgrade.py holds the two the same)
 HEADING = r"^##[ \t]+%s[ \t]*\r?$"
 SECTION = re.compile(r"^##[ \t]")   # a section's heading line, outside a code fence
-FENCE = re.compile(r"^ {0,3}(```|~~~)")
+FENCE = re.compile(r"[ \t]*(`{3,}|~{3,})")   # logfiles.FENCE and its outside_code rule, copied
 # The Template's old and new text after the entries section, where the Log changed its own (review:)
 TEMPLATE_TEXT = os.path.join(BUILD, "pages")
 BOM = b"\xef\xbb\xbf"
@@ -173,9 +177,12 @@ def page_parts(data, heading):
     at, pos, fence = len(rest), len(lines[0]), None
     for line in lines[1:]:
         m = FENCE.match(line)
-        if m:
-            fence = None if fence == m.group(1) else fence or m.group(1)
-        elif not fence and SECTION.match(line):
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line.strip(" \t`~\r\n"):
+                fence = None
+        elif m:
+            fence = m.group(1)
+        elif SECTION.match(line):
             at = pos
             break
         pos += len(line)
@@ -185,8 +192,8 @@ def page_parts(data, heading):
 def pages_at_head(root, version):
     """{front page: (its parts, the old Template's, the Template's texts after its entries section)}
     at HEAD, for each page both have with the entries heading. The texts are the old Template's and
-    each fetched version's before version: an earlier upgrade left a Log's sections after its entries
-    section as they were (before 0.4.1), so they can be an older Template's, unedited."""
+    each fetched version's before version: an older tool left a Log's sections after its entries
+    section as they were, so they can be an earlier release's, unedited."""
     earlier = [v for v in (r[len(REFS) + 1:] for r in git(root, "for-each-ref", "--format=%(refname)", REFS).splitlines())
                if VERSION.match(v) and key(v) < key(version)]
     out = {}

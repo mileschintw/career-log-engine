@@ -373,7 +373,7 @@ class Upgrade(unittest.TestCase):
     def test_engine_updates_the_unedited_sections_after_the_entries_section(self):
         """The owner's text above the entries heading and the entry rows stay; the Template's sections
         after them, unedited, become the release's, in the page's own line ends and byte order mark."""
-        mine = "﻿# My log\n\nMy own words.\n\n## Entries\n\n| Entry |\n|---|\n| [mine](entries/2026-01-x.md) |\n\n"
+        mine = "\ufeff# My log\n\nMy own words.\n\n## Entries\n\n| Entry |\n|---|\n| [mine](entries/2026-01-x.md) |\n\n"
         log, out = self.upgrade_front_page({"README.md": (mine + self.AFTER[0]).replace("\n", "\r\n")},
                                            self.AFTER, self.ZH_AFTER)
         self.assertIn("done: README.md after its `## Entries` section: the Template's text, unedited, now 0.4.0's", out)
@@ -409,8 +409,8 @@ class Upgrade(unittest.TestCase):
             self.assertTrue(f.read().endswith("| Entry |\n|---|\n"))
 
     def test_engine_updates_sections_an_earlier_template_left(self):
-        """An upgrade before 0.4.1 left the sections after the entries section as they were, so a Log
-        moved to 0.4.0 can still hold 0.3.2's: Template text, unedited, though not 0.4.0's."""
+        """An older tool left the sections after the entries section as they were, so a Log it moved
+        to 0.4.0 can still hold 0.3.2's: Template text, unedited, though not 0.4.0's."""
         head = "# career-log\n\nStart with setup.\n\n"
         for version, after in (("0.3.2", self.AFTER[0]), ("0.4.0", "## Upstream\n\nReport it here.\n\n## License\n\nMIT\n"),
                                ("0.4.1", self.AFTER[1])):
@@ -441,6 +441,9 @@ class Upgrade(unittest.TestCase):
         self.assertEqual(upgrade.page_parts(page.encode("utf-8"), "Entries"), (
             "# Log\n", "## Entries\n| a |\n```\n## not a heading\n```\n### Sub\n", "##  End\nMIT\n"))
         self.assertEqual(upgrade.page_parts(b"# Log\n## Entries", "Entries"), ("# Log\n", "## Entries", ""))
+        fenced = "## Entries\n````md\n```\n## in the fence\n````\n~~~\n## in this one too\n## End\n"
+        self.assertEqual(upgrade.page_parts(fenced.encode("utf-8"), "Entries")[2], "")
+        self.assertEqual(upgrade.FENCE.pattern, logfiles.FENCE.pattern)   # the copy holds
         self.assertIsNone(upgrade.page_parts(b"# Log\n", "Entries"))
 
     def test_clean(self):
