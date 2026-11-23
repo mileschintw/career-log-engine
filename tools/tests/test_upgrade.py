@@ -408,6 +408,23 @@ class Upgrade(unittest.TestCase):
         with open(os.path.join(log, "README.md"), encoding="utf-8", newline="") as f:
             self.assertTrue(f.read().endswith("| Entry |\n|---|\n"))
 
+    def test_engine_updates_sections_an_earlier_template_left(self):
+        """An upgrade before 0.4.1 left the sections after the entries section as they were, so a Log
+        moved to 0.4.0 can still hold 0.3.2's: Template text, unedited, though not 0.4.0's."""
+        head = "# career-log\n\nStart with setup.\n\n"
+        for version, after in (("0.3.2", self.AFTER[0]), ("0.4.0", "## Upstream\n\nReport it here.\n\n## License\n\nMIT\n"),
+                               ("0.4.1", self.AFTER[1])):
+            self.front_page_release(version, head, "# career-log\n\n先跑 setup。\n\n", after)
+        top = head + "## Entries\n\n| Entry |\n|---|\n\n"
+        log = self.log("0.4.0", {"README.md": top + self.AFTER[0]})
+        self.assertEqual(self.plan(log)[0], 0)
+        rc, out = self.run_tool("engine", log, "0.4.1")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("done: README.md after its `## Entries` section: the Template's text, unedited, now 0.4.1's", out)
+        self.assertFalse([l for l in out if l.startswith("review:")], out)
+        with open(os.path.join(log, "README.md"), encoding="utf-8", newline="") as f:
+            self.assertEqual(f.read(), top + self.AFTER[1])
+
     def test_engine_is_silent_on_edited_sections_the_release_keeps(self):
         """Nothing to say when the Template's text after the entries section did not change."""
         top = "# career-log\n\nStart with setup.\n\n## Entries\n\n| Entry |\n|---|\n\n"

@@ -28,7 +28,7 @@ files, deletes the Engine files it no longer has unless the Log added them, and 
 own .gitignore lines back under `# This Log's own lines`. A front page (README.md, README.zh-TW.md)
 has two parts the Template writes, each checked on its own: the text above its entries heading, and
 the sections after its entries section; the entries section itself stays. A part still the old
-Template's, unedited, gets <version>'s text: `done: <page> above `## <heading>`: …` or `done: <page>
+Template's, unedited (after the entries section: or an earlier release's), gets <version>'s text: `done: <page> above `## <heading>`: …` or `done: <page>
 after its `## <heading>` section: …`. Sections after it that the Log changed, where <version> changes
 the Template's, stay as the Log has them: `review: <page> after its `## <heading>` section: … from
 <old> to <new>`, the two files under .build/upgrade/pages/ holding the Template's old and new text
@@ -182,15 +182,24 @@ def page_parts(data, heading):
     return above, rest[:at], rest[at:]
 
 
-def pages_at_head(root):
-    """{front page: (its parts, the old Template's)} at HEAD, for each page both have with the
-    entries heading."""
+def pages_at_head(root, version):
+    """{front page: (its parts, the old Template's, the Template's texts after its entries section)}
+    at HEAD, for each page both have with the entries heading. The texts are the old Template's and
+    each fetched version's before version: an earlier upgrade left a Log's sections after its entries
+    section as they were (before 0.4.1), so they can be an older Template's, unedited."""
+    earlier = [v for v in (r[len(REFS) + 1:] for r in git(root, "for-each-ref", "--format=%(refname)", REFS).splitlines())
+               if VERSION.match(v) and key(v) < key(version)]
     out = {}
     for rel, heading in PAGES.items():
         mine = page_parts(show(root, "HEAD", rel), heading)
         theirs = page_parts(show(root, "HEAD", "tools/template/" + rel), heading)
         if mine and theirs:
-            out[rel] = (mine, theirs)
+            texts = {theirs[2]}
+            for v in earlier:
+                parts = page_parts(show(root, ref(v), "tools/template/" + rel), heading)
+                if parts:
+                    texts.add(parts[2])
+            out[rel] = (mine, theirs, texts)
     return out
 
 
@@ -206,12 +215,12 @@ def write_template_text(root, side, rel, text):
 
 def update_pages(root, pages, version):
     """Give each front page version's text above its entries heading, and after its entries section,
-    where that part is still the old Template's; keep its entries section, and the working tree's
-    line ends and byte order mark. Sections after the entries section that the Log changed, where
-    version changes the Template's, stay, with a `review:` line naming the Template's old and new text
-    there (TEMPLATE_TEXT)."""
+    where that part is still the old Template's (after the entries section: any Template's of
+    pages_at_head); keep its entries section, and the working tree's line ends and byte order mark.
+    Sections after the entries section that the Log changed, where version changes the Template's,
+    stay, with a `review:` line naming the Template's old and new text there (TEMPLATE_TEXT)."""
     lines = []
-    for rel, (mine, old) in pages.items():
+    for rel, (mine, old, texts) in pages.items():
         new = page_parts(show(root, ref(version), "tools/template/" + rel), PAGES[rel])
         if not new:
             continue
@@ -219,12 +228,12 @@ def update_pages(root, pages, version):
         if mine[0] == old[0] != new[0]:
             above = new[0]
             lines.append("done: %s above `## %s`: the Template's page, unedited, now %s's" % (rel, PAGES[rel], version))
-        if old[2] != new[2] != mine[2]:
-            where = "%s after its `## %s` section" % (rel, PAGES[rel])
-            if mine[2] == old[2]:
+        where = "%s after its `## %s` section" % (rel, PAGES[rel])
+        if new[2] != mine[2]:
+            if mine[2] in texts:
                 after = new[2]
                 lines.append("done: %s: the Template's text, unedited, now %s's" % (where, version))
-            else:
+            elif old[2] != new[2]:
                 lines.append("review: %s: this Log's own text; %s changes the Template's there, from %s to %s" % (
                     where, version, write_template_text(root, "old", rel, old[2]),
                     write_template_text(root, "new", rel, new[2])))
@@ -379,7 +388,7 @@ def engine(root, version):
         git(root, "rm", "-q", "--ignore-unmatch", "--", *gone)
         lines += ["done: deleted %s (not in %s)" % (p, version) for p in gone]
     present = [p for p in paths_new if files(root, new, [p])]
-    pages = pages_at_head(root)
+    pages = pages_at_head(root, version)
     git(root, "checkout", new, "--", *present)
     lines.append("done: Engine paths from %s" % version)
     lines += update_pages(root, pages, version)
