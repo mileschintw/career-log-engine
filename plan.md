@@ -31,8 +31,8 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
 | e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | started | — |
-| e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | started | — |
-| e32 | pr | #32 #36 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | started | — |
+| e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | PR #43 open, waitchecks | — |
+| e32 | pr | #32 #36 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | PR #44 open, waitchecks | — |
 | e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | started | #33 merges（GO #e22） |
 
 **Main checkout:** none.
