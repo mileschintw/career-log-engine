@@ -60,7 +60,9 @@ Done when the user has said yes to the plan, or the mode has ended at `OK:` or a
 ## 3. One release at a time
 
 For each `step: <version>`, in order:
-1. `<py> -I <tool> engine <root> <version>`. Its `done:` lines are what it changed. On `stop: the next step of the plan is <v>`, run `engine` with `<v>`; on `stop: uncommitted changes`, do item 3 for the step before, or, on the first step, settle them as step 1 item 1 does.
+1. `<py> -I <tool> engine <root> <version>`. Its `done:` lines are what it changed. On `stop: the next step of the plan is <v>`, run `engine` with `<v>`; on `stop: uncommitted changes`, do item 3 for the step before, or, on the first step, settle them as step 1 item 1 does. Its front-page lines:
+   - **`done: <page> above …` or `done: <page> after its … section`:** Template text there that the user never changed now reads as the release's. Name each in step 5's summary, so the user knows their front page's wording changed.
+   - **`review: <page> after … from <old> to <new>`:** the user changed the sections after their front page's entries section, and this release changes the Template's text there. Show them the release's change (`git -C <root> diff --no-index -- <old> <new>`) beside their own text after that section, and ask: take the release's text, keep theirs, or a mix. Write their choice into `<page>` after its entries section, which stays as it is; until they answer, their text stays.
 2. **`guide: <file>`:** follow that guide with the user, all of it. It may start another mode, such as setup; that mode runs its *Trigger check*, as every mode does, and takes the key it prints (this mode takes none); it commits as usual, with `--no-push` right after `commit` in each `sync.py commit` and `sync.py settle commit`: every push waits for step 5. **`guide: none`:** the release changed no Log format; go on.
 3. Commit everything the step changed:
    ```

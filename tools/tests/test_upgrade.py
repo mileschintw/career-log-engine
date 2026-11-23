@@ -307,9 +307,9 @@ class Upgrade(unittest.TestCase):
         with open(p, "rb") as f:
             self.assertEqual(f.read(), b"a 0.4.0\r\nb\r\nc\r\nd mine\r\n")
 
-    def front_page_release(self, version, head, zh_head):
-        page = head + "## Entries\n\n| Entry |\n|---|\n\n## License\n\nMIT\n"
-        zh = zh_head + "## 條目\n\n見英文版。\n"
+    def front_page_release(self, version, head, zh_head, after="## License\n\nMIT\n", zh_after=""):
+        page = head + "## Entries\n\n| Entry |\n|---|\n\n" + after
+        zh = zh_head + "## 條目\n\n見英文版。\n" + zh_after
         with open(os.path.join(TOOLS, "config.py"), encoding="utf-8") as f:
             config = f.read()
         with open(os.path.join(TOOLS, "logfiles.py"), encoding="utf-8") as f:
@@ -332,9 +332,13 @@ class Upgrade(unittest.TestCase):
             sys.path.pop(0)
             sys.modules.pop("logfiles", None)
 
-    def upgrade_front_page(self, edits):
-        self.front_page_release("0.3.2", "# career-log\n\nStart with setup.\n\n", "# career-log\n\n先跑 setup。\n\n")
-        self.front_page_release("0.4.0", "# career-log\n\nStart with the guide.\n\n", "# career-log\n\n先讀指南。\n\n")
+    def upgrade_front_page(self, edits, after=("## License\n\nMIT\n",) * 2, zh_after=("",) * 2):
+        """A Log made from 0.3.2, with edits, after `engine` to 0.4.0; after and zh_after: each page's
+        sections after its entries section, in 0.3.2 and in 0.4.0."""
+        self.front_page_release("0.3.2", "# career-log\n\nStart with setup.\n\n", "# career-log\n\n先跑 setup。\n\n",
+                                after[0], zh_after[0])
+        self.front_page_release("0.4.0", "# career-log\n\nStart with the guide.\n\n", "# career-log\n\n先讀指南。\n\n",
+                                after[1], zh_after[1])
         log = self.log("0.3.2", edits)
         self.assertEqual(self.plan(log)[0], 0)
         rc, out = self.run_tool("engine", log, "0.4.0")
@@ -358,6 +362,62 @@ class Upgrade(unittest.TestCase):
             self.assertEqual(f.read(), mine)
         self.assertFalse(os.path.exists(os.path.join(log, "README.zh-TW.md")))
         self.assertEqual(self.front_page_state(log), "edited")
+
+    # #20: the sections after the entries section (Upstream, renamed Engine repo in 0.4.1, and Upgrade)
+    AFTER = ("## Upstream\n\nReport it in the Template.\n\n## License\n\nMIT\n",
+             "## Engine repo\n\nReport it in the Engine repo.\n\n## Upgrade\n\nDev builds too.\n\n## License\n\nMIT\n")
+    ZH_AFTER = ("## 上游\n\n回報到 Template。\n", "## Engine repo\n\n回報到 Engine repo。\n")
+    REVIEW = ("review: README.md after its `## Entries` section: this Log's own text; 0.4.0 changes the Template's "
+              "there, from .build/upgrade/pages/old/README.md to .build/upgrade/pages/new/README.md")
+
+    def test_engine_updates_the_unedited_sections_after_the_entries_section(self):
+        """The owner's text above the entries heading and the entry rows stay; the Template's sections
+        after them, unedited, become the release's, in the page's own line ends."""
+        mine = "# My log\n\nMy own words.\n\n## Entries\n\n| Entry |\n|---|\n| [mine](entries/2026-01-x.md) |\n\n"
+        log, out = self.upgrade_front_page({"README.md": (mine + self.AFTER[0]).replace("\n", "\r\n")},
+                                           self.AFTER, self.ZH_AFTER)
+        self.assertIn("done: README.md after its `## Entries` section: the Template's text, unedited, now 0.4.0's", out)
+        self.assertIn("done: README.zh-TW.md after its `## 條目` section: the Template's text, unedited, now 0.4.0's", out)
+        self.assertFalse([l for l in out if l.startswith("review:") or "README.md above" in l], out)
+        with open(os.path.join(log, "README.md"), "rb") as f:
+            self.assertEqual(f.read().decode("utf-8"), (mine + self.AFTER[1]).replace("\n", "\r\n"))
+        with open(os.path.join(log, "README.zh-TW.md"), encoding="utf-8", newline="") as f:
+            self.assertEqual(f.read(), "# career-log\n\n先讀指南。\n\n## 條目\n\n見英文版。\n" + self.ZH_AFTER[1])
+        self.assertEqual(self.front_page_state(log), "edited")
+
+    def test_engine_asks_about_edited_sections_after_the_entries_section(self):
+        """An owner who changed those sections keeps them: a `review:` line names the Template's old and
+        new text there, for the mode to offer; the rest of the page still updates."""
+        top = "# career-log\n\nStart with setup.\n\n## Entries\n\n| Entry |\n|---|\n\n"
+        own = self.AFTER[0] + "\n## Contact\n\nMy own section.\n"
+        log, out = self.upgrade_front_page({"README.md": top + own}, self.AFTER, self.ZH_AFTER)
+        self.assertIn(self.REVIEW, out)
+        self.assertIn("done: README.md above `## Entries`: the Template's page, unedited, now 0.4.0's", out)
+        self.assertIn("done: README.zh-TW.md after its `## 條目` section: the Template's text, unedited, now 0.4.0's", out)
+        with open(os.path.join(log, "README.md"), encoding="utf-8", newline="") as f:
+            self.assertEqual(f.read(), top.replace("setup", "the guide") + own)
+        for side, text in (("old", self.AFTER[0]), ("new", self.AFTER[1])):
+            with open(os.path.join(log, ".build", "upgrade", "pages", side, "README.md"), encoding="utf-8", newline="") as f:
+                self.assertEqual(f.read(), text)
+
+    def test_engine_asks_about_sections_the_owner_deleted(self):
+        """A page that ends at its entries section, where the Template's has sections after it."""
+        page = "# career-log\n\nStart with setup.\n\n## Entries\n\n| Entry |\n|---|\n"
+        log, out = self.upgrade_front_page({"README.md": page}, self.AFTER)
+        self.assertEqual([l for l in out if l.startswith("review:")], [self.REVIEW])
+        with open(os.path.join(log, "README.md"), encoding="utf-8", newline="") as f:
+            self.assertTrue(f.read().endswith("| Entry |\n|---|\n"))
+
+    def test_engine_is_silent_on_sections_after_the_entries_section_the_release_keeps(self):
+        """Edited or not, nothing to say when the Template's text there did not change, or when the owner
+        already has the release's."""
+        top = "# career-log\n\nStart with setup.\n\n## Entries\n\n| Entry |\n|---|\n\n"
+        log, out = self.upgrade_front_page({"README.md": top + "## Mine\n\nedited\n"})
+        self.assertFalse([l for l in out if " after its " in l or l.startswith("review:")], out)
+        rmtree(self.tmp)   # a fresh Template: its 0.3.2 and 0.4.0 tags are taken
+        self.setUp()
+        log, out = self.upgrade_front_page({"README.md": top + self.AFTER[1]}, self.AFTER)
+        self.assertFalse([l for l in out if l.startswith("review:") or "README.md after" in l], out)
 
     def test_clean(self):
         log = self.log()
