@@ -215,6 +215,29 @@ class SkillLint(unittest.TestCase):
             (4, "modes/fit.md step 9: no such step"),
         ])
 
+    # A path the export leaves out (tools/checks_for.py's SOURCE_ENGINE) is missing in a Template (#33)
+    SOURCE_ONLY = ("See [publishing](../../../docs/publishing.md) and `docs/maintaining.md › Log format changes`.\n"
+                   "Run maintainer/harness.md step 2.\n")
+    SOURCE_TOOL = {"tools/x.py": 'print("do: see docs/maintaining.md › Log format changes")\n'}
+
+    def test_source_only_path_missing_in_a_template_passes(self):
+        """A root without maintainer/ is a Template or a Log: the source-only paths it names are not
+        there, and the lint checks them in the source instead."""
+        self.assertEqual(self.lint(self.SOURCE_ONLY, self.SOURCE_TOOL), [])
+
+    def test_source_only_path_missing_in_the_source_fails(self):
+        problems = self.lint(self.SOURCE_ONLY, dict(self.SOURCE_TOOL, **{"maintainer/coord.py": ""}))
+        self.assertEqual(sorted(problems), [
+            (1, "docs/maintaining.md: no such file"),
+            (4, "docs/maintaining.md: no such file"),
+            (4, "link ../../../docs/publishing.md: no such file"),
+            (5, "maintainer/harness.md: no such file"),
+        ])
+
+    def test_exported_path_missing_in_a_template_fails(self):
+        self.assertEqual(sorted(self.lint("See `docs/guide.md › Start` and [adr](../../../docs/adr/0001-x.md).\n")),
+                         [(4, "docs/guide.md: no such file"), (4, "link ../../../docs/adr/0001-x.md: no such file")])
+
     def test_repo_skill_passes(self):
         """The skill in this repo passes the lint as committed."""
         p = subprocess.run([sys.executable, "-I", TOOL], capture_output=True, text=True, encoding="utf-8")

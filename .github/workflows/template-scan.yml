@@ -1,6 +1,7 @@
 # Builds the shareable Template from an Engine pull request and fails if the export does: a
 # source-only block left open, or a file name or content matching tools/template/.export-deny, the
 # list every Log starts with (this repo holds no Log, so no .export-deny of its own; ADR 0015).
+# Then runs every check the Template ships in that export, as a Log runs them (#33).
 # This repo's own CI: never exported to the Template.
 name: Template scan
 
@@ -25,6 +26,7 @@ on:
       - "entries/_template.md"
       - ".export-deny"
       - ".export-cleared"
+      - "maintainer/template_checks.py"
       - ".github/workflows/template-scan.yml"
 
 permissions:
@@ -49,3 +51,18 @@ jobs:
           python-version: "3.11"
       - name: Run tools/tests/test_logfiles.py
         run: python -I tools/tests/test_logfiles.py -v
+  # tools/checks_for.py's "template checks" group: the lint and every tools/tests/test_*.py, run in a
+  # fresh export made a git repo, so a check that reads a source-only file fails before a release
+  template-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run the Template's checks in a fresh export
+        run: python -I maintainer/template_checks.py

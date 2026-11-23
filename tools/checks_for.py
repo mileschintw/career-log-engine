@@ -89,6 +89,12 @@ GROUPS = [
         sh("sh tools/export-template.sh <scratch>/export",
            "the last line is `OK`, with no `note: uncommitted` line (it exports commits only: commit first)"),
     ]),
+    # The checks the Template ships, run in a fresh export (#33). It runs every test again, so here only
+    # its own script triggers it; its workflow, shared with the export group, runs it on every Engine path.
+    ("template checks", "template-scan.yml", ["maintainer/template_checks.py"], [
+        py("maintainer/template_checks.py", "the last line is `OK`; a FAIL: line names a check that fails in an "
+           "exported Template: it reads a file only the source has, so skip that part where maintainer/ is missing"),
+    ]),
     ("chat export", "parser-tests.yml", [
         "tools/chat_export.py", "tools/tests/test_chat_export.py", "tools/tests/make_fixtures.py",
         "tools/tests/fixtures/", "tools/tests/expected/", "tools/logfiles.py",

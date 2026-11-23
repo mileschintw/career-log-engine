@@ -17,6 +17,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 REPO = os.path.dirname(TOOLS)
 WORKFLOWS = os.path.join(REPO, ".github", "workflows")
+# The Template's source: a Template or a Log has no maintainer/, and so none of its checks (#33)
+SOURCE = os.path.isdir(os.path.join(REPO, "maintainer"))
 # closing-refs.yml runs on every pull request with a closing keyword, not on paths; dev-build.yml on
 # each push to master, its test in coord-tests.yml
 NO_PATHS = {"closing-refs.yml", "dev-build.yml"}
@@ -162,7 +164,7 @@ class Typical(unittest.TestCase):
             "tools/tests/test_config.py", "tools/tests/test_check.py", "tools/tests/test_speech.py",   # speech.py imports logfiles (#773)
             "tools/tests/test_resume.py", "tools/tests/test_guide.py", "tools/tests/test_skill_lint.py", "tools/skill_lint.py", "tools/tests/test_scan.py",
             "tools/tests/test_fit.py", "tools/tests/test_dashboard.py", "tools/tests/test_sponsorship.py", "tools/tests/test_perplexity.py",
-            "tools/tests/test_upgrade.py", "maintainer/tests/test_harness.py",
+            "tools/tests/test_upgrade.py"] + ["maintainer/tests/test_harness.py"] * SOURCE + [
             "tools/tests/test_writing_lint.py", "tools/tests/test_application.py",
             "tools/tests/test_sync.py"])
 
@@ -212,6 +214,7 @@ class Typical(unittest.TestCase):
         self.assertIn("tools/tests/test_sync.py", got)
         self.assertIn("tools/tests/test_check_save.py", got)
 
+    @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
     def test_closing_refs_apart(self):
         self.assertNotIn("maintainer/tests/test_closing_refs.py", scripts(runs(["tools/deny_coverage.py"])))
         got = scripts(runs([".github/workflows/closing_refs.py"]))
