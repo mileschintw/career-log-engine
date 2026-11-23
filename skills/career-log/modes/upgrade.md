@@ -55,6 +55,8 @@ Tell the user, in one message: the versions from and to, each step, and what hap
 - `dropped:` files are Engine files the new release no longer has: a step deletes them (an edited one shows again in step 4).
 - The Log's own `.gitignore` lines are put back after each step, with no question.
 
+When `to:` is a Dev build (`<version>-dev.<n>`), the same message also says that no Dev build is promised stable and that the newest release stays the default. Say it here even when step 1 did: a Log older than 0.4.1 ran step 1 from its own text, which does not say it.
+
 Done when the user has said yes to the plan, or the mode has ended at `OK:` or a `stop:` the user chose not to settle now.
 
 ## 3. One release at a time

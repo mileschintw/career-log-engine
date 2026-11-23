@@ -22,6 +22,7 @@ on:
       - "tools/export-template.sh"
       - ".github/workflows/closing_refs.py"
       - "tools/deny_coverage.py"
+      - "tools/upgrade.py"
       - ".github/workflows/coord-tests.yml"
 
 permissions:

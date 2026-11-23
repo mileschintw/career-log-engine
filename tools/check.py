@@ -83,13 +83,14 @@ estimates past its threshold (half of what one Read call returns), in every mode
 next: line: the modes say what to do with an entry that size.
 
 Newer Template release: an `update: v<x> available (you have v<y>): ...` line, saying what to do with
-it, when the public Template has a release newer than tools/TEMPLATE_VERSION's version, and
-nothing otherwise. It asks GitHub's Releases API, for the Template tools/upgrade.py fetches
+it, when the public Template has a release newer than tools/TEMPLATE_VERSION's version (a release's,
+or a Dev build's: 0.4.1 is newer than 0.4.1-dev.3), and nothing otherwise; it names releases only,
+never a later Dev build. It asks GitHub's Releases API, for the Template tools/upgrade.py fetches
 (CAREER_LOG_RELEASES_URL overrides the address), at most once a day, for 2 seconds at most,
 sending nothing from the Log, and keeps the answer in ~/.career-log/release.json; offline,
 rate-limited or slow, it says nothing. It never asks with `update_check = "off"` in
-config.toml, in an unattended run, or without a released version in TEMPLATE_VERSION (the
-Template's source, an export's `next`). It only tells: the upgrade mode upgrades.
+config.toml, in an unattended run, or without a release's or Dev build's version in TEMPLATE_VERSION
+(the Template's source, an export's `next`). It only tells: the upgrade mode upgrades.
 
 Session hygiene (SKILL.md › Next up): every mode but log also prints a `mode start: <sha>@<time>`
 line (HEAD and the time, for `done --since`; the mode keeps its first check's, as the line says) and a `next: now, first:` line telling the agent to
@@ -1307,7 +1308,9 @@ def check_release(ctx):
             return [], [], False
         upgrade = tools_module("upgrade")
         have = upgrade.stamped(ctx.root)[0]
-        if not have or not upgrade.SEMVER.match(have):   # no stamp, or `next`: an unreleased export
+        # A Dev build compares too (#15), against the same releases: the upgrade mode's default target is
+        # the newest release, and a later Dev build, reached only by name, is never asked for or named
+        if not have or not upgrade.VERSION.match(have):   # no stamp, or `next`: an unreleased export
             return [], [], False
         now = time.time()
         known, latest = cached_release(ctx, now)

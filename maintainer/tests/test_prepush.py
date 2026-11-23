@@ -4,7 +4,7 @@ local bare repository as the remote) and a scratch deny list; nothing reaches Gi
 
   python3 -I maintainer/tests/test_prepush.py
 """
-import importlib.util, io, os, shutil, subprocess, sys, tempfile, unittest
+import importlib.util, io, os, re, shutil, subprocess, sys, tempfile, unittest
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -232,6 +232,16 @@ class Scan(Repo):
     def test_usage(self):
         self.assertEqual(self.run_main("scan", "HEAD")[0], 2)
         self.assertEqual(self.run_main()[0], 2)
+
+
+class Export(unittest.TestCase):
+    def test_licence_name_matches_the_export_scan(self):
+        """The file whose contents the check leaves out is the one the export's scan leaves out
+        (tools/export-template.sh: `grep --exclude=<name>`): a rename on one side alone fails here."""
+        path = os.path.join(HERE, "..", "..", "tools", "export-template.sh")
+        with open(path, encoding="utf-8") as f:
+            names = [n.strip("'\"") for n in re.findall(r"--exclude=(\S+)", f.read())]
+        self.assertEqual(names, [prepush.LICENCE], "export-template.sh's --exclude= names %r" % names)
 
 
 class Hook(Repo):

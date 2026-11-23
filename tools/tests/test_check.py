@@ -2676,12 +2676,13 @@ class ReleaseTest(unittest.TestCase):
         for name in ("UNATTENDED", "RELEASES_URL"):
             self.addCleanup(setattr, check, name, getattr(check, name))
         check.UNATTENDED = False
-        self.requests, self.body, self.delay = [], b'{"tag_name": "v0.3.0"}', 0
+        self.requests, self.paths, self.body, self.delay = [], [], b'{"tag_name": "v0.3.0"}', 0
         test = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
                 test.requests.append(dict(self.headers))
+                test.paths.append(self.path)
                 time.sleep(test.delay)
                 try:
                     self.send_response(200)
@@ -2718,6 +2719,34 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(self.release(), ([UPDATE_LINE], [], False))
         self.assertEqual(self.cache()["latest"], "0.3.0")
         self.assertNotIn("Authorization", self.requests[0])
+        self.assertEqual(self.paths, ["/releases/latest"])   # the one address, on a release as on a Dev build
+
+    def test_dev_build_is_told_of_a_release_at_or_after_it(self):
+        """#15: a Log on a Dev build hears of the newest release past its version, from the same address
+        a release asks; a later Dev build is never named (the upgrade mode reaches one only by name)."""
+        for have, tag, told in (("0.3.0-dev.2", b"v0.3.0", True),   # the release the build was on its way to
+                                ("0.2.1-dev.1", b"v0.3.0", True),
+                                ("0.3.1-dev.1", b"v0.3.0", False),   # the release before the build
+                                ("0.2.1-dev.1", b"v0.2.1-dev.2", False)):   # a Dev build is no release
+            self.forget()
+            self.stamp(have)
+            self.body = b'{"tag_name": "%s"}' % tag
+            line = UPDATE_LINE.replace("v0.2.0", "v" + have)
+            self.assertEqual(self.release(), ([line] if told else [], [], False), (have, tag))
+        self.assertEqual(self.paths, ["/releases/latest"] * 4)
+        self.release()
+        self.assertEqual(len(self.paths), 4)   # once a day, as on a release
+
+    def test_default_address_is_the_templates_releases_api_on_a_release_and_a_dev_build(self):
+        asked = []
+        self.addCleanup(setattr, check, "latest_release", check.latest_release)
+        check.latest_release = lambda url: asked.append(url) or "0.3.0"
+        check.RELEASES_URL = None
+        for have in ("0.2.0", "0.2.1-dev.1"):
+            self.forget()
+            self.stamp(have)
+            self.assertEqual(self.release()[0], [UPDATE_LINE.replace("v0.2.0", "v" + have)], have)
+        self.assertEqual(asked, ["https://api.github.com/repos/mileschintw/career-log-template/releases/latest"] * 2)
 
     def test_same_or_older_release_is_silent(self):
         for tag in (b"v0.2.0", b"v0.1.9"):
