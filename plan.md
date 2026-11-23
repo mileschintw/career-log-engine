@@ -1,6 +1,6 @@
 # Plan
 
-Last updated: 2026-11-23（記錄從維護者私人的記錄搬來，重新開始）
+Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 只寫現況。做完的搬到 `plan-history.md`，這裡留一行指標；什麼都不刪。下面這些一直留在這份：**Now** 的 session、還沒寫進 repo 文件的 **Rulings**、兩個 **Waiting for the user** 節、**Deadlines**，以及 **Handover** 裡使用者的常駐交代和 merge right。
 
@@ -8,8 +8,8 @@ Last updated: 2026-11-23（記錄從維護者私人的記錄搬來，重新開�
 
 ## Handover
 
-- **Coordinator:** none. 上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）2026-11-23 把記錄搬到這裡後交出；下一個 coordinator 在 `D:\Repos\career-log-engine` 開 session、跑 `/relay:coordinate` 接手。
-- **Next（2026-11-23）：** 沒有 lane、沒有鬧鐘、沒有開著的 PR。等使用者決定下一步（**Waiting for the user's decision**）；Roadmap 上的 issue 都還沒排 lane。下一個 coordinator 先跑 `ready`（`--repo <owner>/career-log-engine --checkout D:\Repos\career-log-engine`），再把 Waiting 那幾件問使用者。
+- **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
+- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。已把 **Waiting for the user's decision** 問使用者，等回覆；使用者說開工前不開 lane、不開 issue。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
