@@ -255,12 +255,11 @@ class Publish(Temp):
 class TemplateAddress(unittest.TestCase):
     """#23: the Template's address is tools/upgrade.py's URL, not a copy of it."""
 
-    def test_publish_clones_upgrade_url_by_default(self):
-        spec = importlib.util.spec_from_file_location("upgrade_tool", os.path.join(REPO, "tools", "upgrade.py"))
-        upgrade = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(upgrade)
-        self.assertEqual(coord.TEMPLATE_URL, upgrade.URL)
-        tree = ast.parse(open(os.path.join(HERE, "..", "coord.py"), encoding="utf-8").read())
+    def test_template_url_is_upgrade_url(self):
+        self.assertTrue(os.path.samefile(coord.upgrade.__file__, os.path.join(REPO, "tools", "upgrade.py")))
+        self.assertEqual(coord.TEMPLATE_URL, coord.upgrade.URL)
+        with open(os.path.join(HERE, "..", "coord.py"), encoding="utf-8") as f:
+            tree = ast.parse(f.read())
         literals = [n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
         self.assertFalse([s for s in literals if "career-log-template" in s], "coord.py writes the address out")
 

@@ -219,11 +219,15 @@ class SkillLint(unittest.TestCase):
     UPGRADE_PY = ('URL = "https://github.com/acme/career-log-template.git"\n'
                   'DEV_URL = "https://github.com/acme/career-log-engine.git"\n')
 
-    def address_problems(self, files, upgrade_py=UPGRADE_PY):
-        extra = dict(files)
+    MIRROR = {"docs/mirror.md": "https://gitdiagram.com/acme/career-log-template\n"}
+
+    def address_problems(self, files, upgrade_py=UPGRADE_PY, mirror=MIRROR):
+        """The address problems in TREE plus files, tools/upgrade.py and a page that uses MIRRORS."""
+        extra = dict(mirror, **files)
         if upgrade_py is not None:
             extra["tools/upgrade.py"] = upgrade_py
-        return [(n, msg) for n, msg in self.lint("", extra) if "address" in msg or "URL" in msg]
+        return [(n, msg) for n, msg in self.lint("", extra)
+                if msg.startswith(("address ", "MIRRORS ")) or "addresses" in msg]
 
     def test_addresses_that_match_the_constants_pass(self):
         self.assertEqual(self.address_problems({
@@ -232,6 +236,7 @@ class SkillLint(unittest.TestCase):
                                         "[diagram](https://gitdiagram.com/acme/career-log-template/video)\n",
             "skills/career-log/modes/upgrade.md": "git fetch https://github.com/acme/career-log-engine.git\n"
                                                  "git@github.com:acme/career-log-template.git\n",
+            "SETUP.md": "Clone https://github.com/acme/Career-Log-Template.git\n",
             "docs/publishing.md": "gh release create --repo acme/career-log-template\n"
                                   "github.com/<owner>/career-log-engine, <owner>/career-log-template\n"
                                   "the staging copy acme/career-log-template-staging, ~/src/career-log-engine\n",
@@ -255,11 +260,30 @@ class SkillLint(unittest.TestCase):
         self.assertIn("address gitlab.com/acme/career-log-engine: host gitlab.com, not github.com as upgrade.DEV_URL says",
                       problems[0][1])
 
-    def test_tests_folders_hold_fixtures_and_are_skipped(self):
+    def test_a_wrong_owner_in_a_root_file_or_any_case_fails(self):
+        self.assertEqual(self.address_problems({
+            "tools/export-template.sh": 'ALLOW="skills tools SETUP.md"\n',   # SETUP.md is checked as the export's
+            "SETUP.md": "x\ny\ngit clone https://github.com/someone/Career-Log-Engine.git\n",
+            "LICENSE": "See github.com/someone/career-log-template.\n",
+        }), [
+            (1, "address github.com/someone/career-log-template: owner someone, not acme as upgrade.URL says"),
+            (3, "address github.com/someone/Career-Log-Engine: owner someone, not acme as upgrade.DEV_URL says"),
+        ])
+
+    def test_the_fixture_folders_are_skipped_and_no_other_tests_folder(self):
         self.assertEqual(self.address_problems({
             "tools/tests/fixtures/x.md": "https://github.com/someone/career-log-template\n",
             "maintainer/tests/test_x.py": "'github.com/someone/career-log-engine'\n",
-        }), [])
+            "skills/career-log/tests/a.md": "github.com/someone/career-log-engine\n",
+        }), [(1, "address github.com/someone/career-log-engine: owner someone, not acme as upgrade.DEV_URL says")])
+
+    def test_an_export_with_no_allow_line_fails(self):
+        self.assertEqual(self.address_problems({"tools/export-template.sh": "ALLOW=skills\n"}),
+                         [(0, "no ALLOW=\"...\" line: the repos' addresses in the export's paths go unchecked")])
+
+    def test_a_mirror_no_address_uses_fails(self):
+        self.assertEqual(self.address_problems({}, mirror={}),
+                         [(0, "MIRRORS lists gitdiagram.com, which no address uses: take it out")])
 
     def test_constants_that_name_no_address_fail(self):
         self.assertEqual(self.address_problems({}, upgrade_py='URL = "https://github.com/acme/career-log-template"\n'),
