@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。使用者確認了三件決定（見 `plan-history.md`），#31–#33 已開，13 個 lane session 已 archive，8 條分支已刪。已提出第一輪 lane，等使用者說開工和 merge right。
+- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。使用者確認了三件決定（見 `plan-history.md`），#31–#33 已開，13 個 lane session 已 archive，8 條分支已刪。第一輪已開工（merge right 見下）：e33、e15、e20、e21、e23 在跑；e27、e31、e32、e22 是卡片，app 一次最多開 5 個，等使用者按卡片。卡片開的 session 分支名由 app 取，對 Now 表時看 session 的 branch。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -30,6 +30,15 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
+| e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | started | — |
+| e15 | pr | #15 | local_c068efcd-7d35-45a8-a8de-e767f7bb9f52（落在已 archive 的 `.claude/worktrees/lane-e14-296d3a`，分支 `claude/lane-e15-*`） | started | — |
+| e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | started | — |
+| e21 | pr | #21 | local_6dca5a18-ff19-4fdd-91bb-7b06a4b65673（落在已 archive 的 `.claude/worktrees/lane-e7-af6541`，分支 `claude/lane-e21-*`） | started | — |
+| e23 | pr | #23 | local_a4f94a65-33f2-4e28-b6e1-0f9bb83fd226（落在已 archive 的 `.claude/worktrees/lane-825-379001`，分支 `claude/lane-e23-*`） | started | — |
+| e27 | pr | #27 | 卡片 task_2e9a3682，等使用者按（app 一次最多 5 個在跑） | not started | — |
+| e31 | pr | #31 | 卡片 task_d54a03ac，等使用者按 | not started | — |
+| e32 | pr | #32 | 卡片 task_396ec7b4，等使用者按 | not started | — |
+| e22 | pr | #22 | 卡片 task_bf318c97，等使用者按 | not started | #33 merges（GO #e22） |
 
 **Main checkout:** none.
 
@@ -60,7 +69,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第一輪 lane（since 2026-11-23）：** 要不要開工、開哪些、merge right，等使用者。
+- **四張 lane 卡片（since 2026-11-23）：** e27、e31、e32、e22 等使用者按卡片開 session（e22 開了會 park 到 #33 merge）。
 
 ## Deadlines
 
