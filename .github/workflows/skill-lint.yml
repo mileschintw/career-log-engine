@@ -23,6 +23,10 @@ on:
       - "tools/skill_lint.py"
       - "tools/tests/test_guide.py"
       - "tools/tests/test_skill_lint.py"
+      - "tools/upgrade.py"
+      - "tools/export-template.sh"
+      - "docs/publishing.md"
+      - "docs/maintaining.md"
       - ".github/workflows/skill-lint.yml"
 
 permissions:
