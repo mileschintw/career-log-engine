@@ -168,13 +168,16 @@ class ConfigTest(unittest.TestCase):
             return f.read()
 
     def comment_above(self, field):
-        """The defaults file's comment lines right above field's line, read in the test's own way."""
+        """The comment lines of the defaults file's paragraph that holds field, read in the test's own
+        way: a field that shares a paragraph shares its comment."""
         lines = self.defaults_text().splitlines()
         i = next(k for k, l in enumerate(lines) if l.startswith(field + " ="))
         top = i
-        while top and lines[top - 1].startswith("#"):
+        while top and lines[top - 1].strip():
             top -= 1
-        return "".join(l + "\n" for l in lines[top:i])
+        comment = "".join(l + "\n" for l in lines[top:i] if l.startswith("#"))
+        self.assertTrue(comment, field)
+        return comment
 
     def test_set_places_a_missing_middle_field_with_its_comment(self):
         self.run_tool("init")
@@ -215,6 +218,10 @@ class ConfigTest(unittest.TestCase):
         self.write(mine)   # the last field: after update_check, the end of the file
         self.assertEqual(self.run_tool("set", "plan_preview", "never")[1][-1], "written")
         self.assertEqual(self.read(), mine + "\n" + self.comment_above("plan_preview") + 'plan_preview = "never"\n')
+        self.write(mine)   # a field that shares its paragraph's comment, none of the paragraph in the file
+        self.assertEqual(self.run_tool("set", "fit_budget", "9")[1][-1], "written")
+        self.assertEqual(self.read(), mine.replace("window = 30\n", "window = 30\n\n" + self.comment_above("fit_budget")
+                                                   + "fit_budget = 9\n"))
         self.write("# Only a note so far.\n")   # no field at all: at the end
         self.assertEqual(self.run_tool("set", "m", "6")[1][-1], "written")
         self.assertEqual(self.read(), "# Only a note so far.\n\n" + self.comment_above("m") + "m = 6\n")
@@ -227,10 +234,14 @@ class ConfigTest(unittest.TestCase):
         for field in config.FIELDS:
             with self.subTest(field=field):
                 i = next(k for k, l in enumerate(lines) if l.startswith(field + " ="))
-                top = i - self.comment_above(field).count("\n")
-                if top < i and (i + 1 == len(lines) or not lines[i + 1]):   # alone under its comment
-                    cut = lines[:top - 1] + lines[i + 1:] if i + 1 == len(lines) else lines[:top] + lines[i + 2:]
-                else:
+                last = i + 1 == len(lines)
+                if lines[i - 1].startswith("#") and (last or not lines[i + 1]):   # alone in its paragraph
+                    top = i - self.comment_above(field).count("\n")
+                    if last:   # the paragraph and the blank line above it
+                        cut = lines[:top - 1]
+                    else:      # the paragraph and the blank line below it
+                        cut = lines[:top] + lines[i + 2:]
+                else:          # the line alone
                     cut = lines[:i] + lines[i + 1:]
                 self.assertEqual(config.placed("".join(l + "\n" for l in cut), field, lines[i]), full)
 

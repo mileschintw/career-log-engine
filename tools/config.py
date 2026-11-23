@@ -24,8 +24,8 @@ set: checks the field's name and value, prints `before:` and `after:` lines, and
 value in place, keeping the file's comments; a field the file leaves out goes where
 tools/config.default.toml has it, under that file's comment lines for it. --dry-run prints and
 writes nothing. A value equal to the current one, a `(default)` one too, prints `unchanged` and
-writes nothing. It refuses a value
-that would put fit_budget above screen_budget (ORDERED), naming the other field to change first.
+writes nothing. It refuses a value that would put fit_budget above screen_budget (ORDERED), naming
+the other field to change first.
   front_page trimmed: when README.md above `## Entries` is still the Template's page, it also
   replaces that part with the personal index (TRIMMED) and deletes README.zh-TW.md, saying so on a
   `front page:` line; refused when the page is neither the Template's nor that index (the user's
@@ -305,11 +305,13 @@ def set_field(root, field, value, dry_run=False):
         return out + ([NOTICES[field, value]] if (field, value) in NOTICES else []) + ["dry run: nothing written"]
     with open(path(root), encoding="utf-8-sig") as f:
         text = f.read()
-    pattern = field_line(field)
-    if pattern.search(text):
-        text = pattern.sub(lambda m: line, text, count=1)
-    else:
+    rows = text.split("\n")
+    k = next((k for k, row in enumerate(rows) if field_name(row) == field), None)
+    if k is None:
         text = placed(text, field, line)
+    else:
+        rows[k] = line
+        text = "\n".join(rows)
     if parse(text, path(root)).get(field) != value:   # nothing is written that does not parse to the new value
         raise ConfigError("%s: could not place `%s` in it; edit the file by hand" % (path(root), line))
     if trim:
@@ -323,47 +325,50 @@ def set_field(root, field, value, dry_run=False):
     return out + ["written"]
 
 
-def field_line(field):
-    """The line of a config.toml's text that sets field."""
-    return re.compile(r"^[ \t]*%s[ \t]*=.*$" % re.escape(field), re.M)
-
-
 def field_name(line):
-    """The Config field a line sets, or None."""
+    """The Config field a line of config.toml sets, or None."""
     m = re.match(r"[ \t]*(\w+)[ \t]*=", line)
     return m[1] if m and m[1] in FIELDS else None
+
+
+def default_paragraphs():
+    """{field: (paragraph, comment lines)} in tools/config.default.toml's order: the number of the
+    paragraph (lines between blank lines) that holds the field there, and that paragraph's comment
+    lines, which every field in it shares."""
+    out, n, comment = {}, 0, []
+    for row in logfiles.read_text(DEFAULTS_FILE).split("\n"):
+        if not row.strip():
+            n, comment = n + 1, []
+        elif field_name(row):
+            out[field_name(row)] = (n, comment)
+        else:
+            comment = comment + [row]
+    return out
 
 
 def placed(text, field, line):
     """config.toml's text, which leaves field out, with `line` where tools/config.default.toml has
     field. A field that shares a paragraph there with one in text goes right under the one before
     it (above the one after it when only that one is in text). Any other goes in as its own
-    paragraph, the defaults file's comment lines above it: after the last field in text that comes
-    before it there; else above the topmost field in text, and the comment lines above that one;
-    else at the end."""
-    order, para, comment, above, n = [], {}, {}, [], 0
-    for row in logfiles.read_text(DEFAULTS_FILE).split("\n"):
-        name = field_name(row)
-        if not row.strip():
-            n, above = n + 1, []
-        elif name:
-            order.append(name)
-            para[name], comment[name], above = n, above, []
-        else:
-            above = above + [row]
+    paragraph, under its paragraph's comment lines there: after the last field in text that comes
+    before it there; else above the topmost field in text, and the comment lines right above that
+    one; else at the end."""
+    paragraphs = default_paragraphs()
+    order = list(paragraphs)
     rows = text.split("\n")
     if rows[-1] == "":
         rows.pop()
-    at = {}
+    at = {}   # field: its row in text
     for k, row in enumerate(rows):
-        if field_name(row):
-            at.setdefault(field_name(row), k)
+        if name := field_name(row):
+            at.setdefault(name, k)
     i = order.index(field)
     before = [f for f in order[:i] if f in at]
     after = [f for f in order[i + 1:] if f in at]
-    if before and para[before[-1]] == para[field]:
+    para, comment = paragraphs[field]
+    if before and paragraphs[before[-1]][0] == para:
         k, new = at[before[-1]] + 1, [line]
-    elif after and para[after[0]] == para[field]:
+    elif after and paragraphs[after[0]][0] == para:
         k, new = at[after[0]], [line]
     else:
         if before:
@@ -374,7 +379,7 @@ def placed(text, field, line):
                 k -= 1
         else:
             k = len(rows)
-        new = comment[field] + [line]
+        new = comment + [line]
         if k and rows[k - 1].strip():
             new = [""] + new
         if k < len(rows) and rows[k].strip():
