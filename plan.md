@@ -15,7 +15,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** none
+- **Merge right:** 2026-11-23 15:14 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第一輪的 9 條 lane 嗎？）：lanes e33、e15、e20、e21、e23、e27、e31、e32、e22。
 - **Unattended log:** none
 
 ## Rulings
@@ -39,20 +39,20 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
-| #15 Log 在 Dev build 上時 check.py 沒有 update 行 | — | none | none | `tools/check.py`、`tools/tests/test_check.py` | 不排 lane：使用者 picked「開 issue，轉換完再做」；等使用者排 |
+| #15 Log 在 Dev build 上時 check.py 沒有 update 行 | 1 | none | none | `tools/check.py`、`tools/tests/test_check.py` | 第一輪 lane e15 |
 | #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；0.4.1 發出去後錯的 `stop:` 不會再出現，剩一個假設 |
-| #20 既有 Log 升級後 front page 的 Upstream／Upgrade 兩段是舊文字 | — | none | none | `tools/upgrade.py`、`modes/upgrade.md` | 不排 lane：使用者 picked「開 issue，轉換完再做」；等使用者排 |
-| #21 pre-push：hook 檔頭的舊安裝指令、LICENSE 例外的 guard | — | none | none | `maintainer/hooks/pre-push`、`maintainer/tests/test_prepush.py` | 不排 lane：等使用者排 |
-| #22 版本字串只定義一次 | — | none | none | `maintainer/devbuild.py`、`tools/tests/test_upgrade.py`、`maintainer/tests/test_devbuild.py` | 不排 lane：等使用者排 |
-| #23 兩個 repo 位址的 guard | — | none | none | `tools/skill_lint.py` 或測試、`maintainer/coord.py` | 不排 lane：等使用者排 |
+| #20 既有 Log 升級後 front page 的 Upstream／Upgrade 兩段是舊文字 | 1 | none | none | `tools/upgrade.py`、`modes/upgrade.md` | 第一輪 lane e20 |
+| #21 pre-push：hook 檔頭的舊安裝指令、LICENSE 例外的 guard | 1 | none | none | `maintainer/hooks/pre-push`、`maintainer/tests/test_prepush.py` | 第一輪 lane e21 |
+| #22 版本字串只定義一次 | 2 | none | after #33, `tools/tests/test_upgrade.py › Export` | `maintainer/devbuild.py`、`tools/tests/test_upgrade.py`、`maintainer/tests/test_devbuild.py` | 第一輪 lane e22，parked until #33 merges |
+| #23 兩個 repo 位址的 guard | 1 | none | none | `tools/skill_lint.py` 或測試、`maintainer/coord.py` | 第一輪 lane e23 |
 | #24 一個 rmtree helper | — | none | none | 多個測試檔和 maintainer 工具 | 不排 lane：優先度低 |
-| #27 升級模式：舊版 Log 升到 Dev build 時讀不到「不保證穩定」的警告 | — | none | none | `skills/career-log/modes/upgrade.md › step 2` | 不排 lane：等使用者排 |
+| #27 升級模式：舊版 Log 升到 Dev build 時讀不到「不保證穩定」的警告 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 2` | 第一輪 lane e27 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #31 `config.py set`：檔裡沒有的欄位加在檔尾、沒有註解 | — | none | none | `tools/config.py › set_field`、`tools/tests/test_config.py` | 不排 lane：低優先；等使用者排 |
-| #32 關 blank issue；#18 的 guard 測試對每個 maintainer 工具都跑 | — | none | none | `.github/ISSUE_TEMPLATE/config.yml`（新）、`tools/checks_for.py › GROUPS` 的 `coord` 群組、`coord-tests.yml › paths:` | 不排 lane：等使用者排 |
-| #33 匯出帶的檢查在 Template 和每個 Log 裡 fail（讀只在原始碼的檔） | — | none | none | `tools/skill_lint.py`、`tools/tests/test_skill_lint.py`、`test_logfiles.py › TableHelpers`、`test_checks_for.py › Typical`、`test_upgrade.py › Source／Export／NextGuide`、匯出用的 workflow 和它在 `checks_for.py` map 的項目 | 不排 lane：高優先；等使用者排 |
+| #31 `config.py set`：檔裡沒有的欄位加在檔尾、沒有註解 | 1 | none | none | `tools/config.py › set_field`、`tools/tests/test_config.py` | 第一輪 lane e31 |
+| #32 關 blank issue；#18 的 guard 測試對每個 maintainer 工具都跑 | 1 | none | none | `.github/ISSUE_TEMPLATE/config.yml`（新）、`tools/checks_for.py › GROUPS` 的 `coord` 群組、`coord-tests.yml › paths:` | 第一輪 lane e32 |
+| #33 匯出帶的檢查在 Template 和每個 Log 裡 fail（讀只在原始碼的檔） | 1 | none | none | `tools/skill_lint.py`、`tools/tests/test_skill_lint.py`、`test_logfiles.py › TableHelpers`、`test_checks_for.py › Typical`、`test_upgrade.py › Source／Export／NextGuide`、匯出用的 workflow 和它在 `checks_for.py` map 的項目 | 第一輪 lane e33 |
 
 ## Waiting for the user to be present
 
