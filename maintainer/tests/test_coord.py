@@ -252,6 +252,18 @@ class Publish(Temp):
         self.assertFalse(os.path.exists(os.path.join(self.scratch, "tpl")))
 
 
+class TemplateAddress(unittest.TestCase):
+    """#23: the Template's address is tools/upgrade.py's URL, not a copy of it."""
+
+    def test_template_url_is_upgrade_url(self):
+        self.assertTrue(os.path.samefile(coord.upgrade.__file__, os.path.join(REPO, "tools", "upgrade.py")))
+        self.assertEqual(coord.TEMPLATE_URL, coord.upgrade.URL)
+        with open(os.path.join(HERE, "..", "coord.py"), encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        literals = [n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+        self.assertFalse([s for s in literals if "career-log-template" in s], "coord.py writes the address out")
+
+
 class OneExportRunner(unittest.TestCase):
     """#18: coord.export runs tools/export-template.sh for every maintainer tool, and
     coord.exported_from writes the line naming the source repo; a copy of either outside coord fails,

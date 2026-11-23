@@ -29,7 +29,10 @@ Standard library only, Python 3.11+.
 import argparse, json, os, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATE_URL = "https://github.com/mileschintw/career-log-template"
+sys.path.insert(0, os.path.join(ROOT, "tools"))   # -I leaves it off sys.path
+import upgrade   # noqa: E402
+
+TEMPLATE_URL = upgrade.URL   # the Template's one address, which tools/skill_lint.py checks the others against
 # The repo an export is made from, as a release's and a Dev build's messages name it (ADR 0015)
 SOURCE_REPO = "career-log-engine"
 
