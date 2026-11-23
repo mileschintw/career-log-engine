@@ -31,13 +31,13 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
 | e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | started | — |
-| e15 | pr | #15 | local_c068efcd-7d35-45a8-a8de-e767f7bb9f52（落在已 archive 的 `.claude/worktrees/lane-e14-296d3a`，分支 `claude/lane-e15-*`） | started | — |
+| e15 | pr | #15 | local_c068efcd-7d35-45a8-a8de-e767f7bb9f52（落在已 archive 的 `.claude/worktrees/lane-e14-296d3a`，分支 `claude/lane-e15-*`） | PR #38 open, waitchecks | — |
 | e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | started | — |
-| e21 | pr | #21 | local_6dca5a18-ff19-4fdd-91bb-7b06a4b65673（落在已 archive 的 `.claude/worktrees/lane-e7-af6541`，分支 `claude/lane-e21-*`） | started | — |
+| e21 | pr | #21 | local_6dca5a18-ff19-4fdd-91bb-7b06a4b65673（落在已 archive 的 `.claude/worktrees/lane-e7-af6541`，分支 `claude/lane-e21-*`） | PR #39 open, waitchecks | — |
 | e23 | pr | #23 | local_a4f94a65-33f2-4e28-b6e1-0f9bb83fd226（落在已 archive 的 `.claude/worktrees/lane-825-379001`，分支 `claude/lane-e23-*`） | started | — |
-| e27 | pr | #27 | local_2b4f703a-dc6d-449b-b5ec-c27e246311a5（使用者按卡片開；落在已 archive 的 `.claude/worktrees/lane-824-c07deb`，分支 `claude/keen-hellman-848c87`） | started | — |
-| e31 | pr | #31 | local_de73c331-cd14-4bfa-862c-705c4a6a065b（卡片；落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/xenodochial-grothendieck-a9c012`） | started | — |
-| e32 | pr | #32 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | started | — |
+| e27 | pr | #27 | local_2b4f703a-dc6d-449b-b5ec-c27e246311a5（使用者按卡片開；落在已 archive 的 `.claude/worktrees/lane-824-c07deb`，分支 `claude/keen-hellman-848c87`） | PR #40 open, waitchecks | — |
+| e31 | pr | #31 | local_de73c331-cd14-4bfa-862c-705c4a6a065b（卡片；落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/xenodochial-grothendieck-a9c012`） | PR #41 open, waitchecks | — |
+| e32 | pr | #32 #36 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | started | — |
 | e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | started | #33 merges（GO #e22） |
 
 **Main checkout:** none.
@@ -62,7 +62,7 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | #31 `config.py set`：檔裡沒有的欄位加在檔尾、沒有註解 | 1 | none | none | `tools/config.py › set_field`、`tools/tests/test_config.py` | 第一輪 lane e31 |
 | #32 關 blank issue；#18 的 guard 測試對每個 maintainer 工具都跑 | 1 | none | none | `.github/ISSUE_TEMPLATE/config.yml`（新）、`tools/checks_for.py › GROUPS` 的 `coord` 群組、`coord-tests.yml › paths:` | 第一輪 lane e32 |
 | #33 匯出帶的檢查在 Template 和每個 Log 裡 fail（讀只在原始碼的檔） | 1 | none | none | `tools/skill_lint.py`、`tools/tests/test_skill_lint.py`、`test_logfiles.py › TableHelpers`、`test_checks_for.py › Typical`、`test_upgrade.py › Source／Export／NextGuide`、匯出用的 workflow 和它在 `checks_for.py` map 的項目 | 第一輪 lane e33 |
-| #36 checks_for.py：`prepush` 群組沒列 `tools/export-template.sh` | — | none | none | `tools/checks_for.py › GROUPS`（`prepush` 群組） | 不排 lane：e21 開的；很小，可以併進 e32（同檔不同群組）或下一輪，等使用者 |
+| #36 checks_for.py：`prepush` 群組沒列 `tools/export-template.sh` | 1 | none | none | `tools/checks_for.py › GROUPS`（`prepush` 群組） | 併進 e32（2026-11-23 使用者 picked「Fold into e32」） |
 | #37 升級模式：Sonnet 沒等使用者 yes 就走過 step 2 的計畫 | — | none | after #27, `skills/career-log/modes/upgrade.md › step 2` | `skills/career-log/modes/upgrade.md › step 2` | 不排 lane：needs-triage，e20 開的；等使用者 |
 
 ## Waiting for the user to be present
@@ -71,7 +71,7 @@ none
 
 ## Waiting for the user's decision
 
-- **worker 開的兩張 issue（since 2026-11-23）：** #36（e21 開的，`prepush` 群組少列 `tools/export-template.sh`）建議併進 e32（同一個 `GROUPS`、只加一行），要使用者同意改 e32 的範圍；#37（e20 開的，Sonnet 沒等 yes 就走過 step 2）needs-triage，和 e27 同一節，建議 e27 merge 後再排。
+- **#37（since 2026-11-23）：** e20 開的，Sonnet 沒等 yes 就走過 step 2；needs-triage，和 e27 同一節，建議 e27 merge 後再排。
 
 ## Deadlines
 
