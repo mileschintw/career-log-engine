@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。已把 **Waiting for the user's decision** 問使用者，等回覆；使用者說開工前不開 lane、不開 issue。
+- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。使用者確認了三件決定（見 `plan-history.md`），#31–#33 已開，13 個 lane session 已 archive，8 條分支已刪。已提出第一輪 lane，等使用者說開工和 merge right。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -50,6 +50,9 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
+| #31 `config.py set`：檔裡沒有的欄位加在檔尾、沒有註解 | — | none | none | `tools/config.py › set_field`、`tools/tests/test_config.py` | 不排 lane：低優先；等使用者排 |
+| #32 關 blank issue；#18 的 guard 測試對每個 maintainer 工具都跑 | — | none | none | `.github/ISSUE_TEMPLATE/config.yml`（新）、`tools/checks_for.py › GROUPS` 的 `coord` 群組、`coord-tests.yml › paths:` | 不排 lane：等使用者排 |
+| #33 匯出帶的檢查在 Template 和每個 Log 裡 fail（讀只在原始碼的檔） | — | none | none | `tools/skill_lint.py`、`tools/tests/test_skill_lint.py`、`test_logfiles.py › TableHelpers`、`test_checks_for.py › Typical`、`test_upgrade.py › Source／Export／NextGuide`、匯出用的 workflow 和它在 `checks_for.py` map 的項目 | 不排 lane：高優先；等使用者排 |
 
 ## Waiting for the user to be present
 
@@ -57,9 +60,7 @@ none
 
 ## Waiting for the user's decision
 
-- **兩張可能要開的 issue（since 2026-11-23）：** (1) 匯出帶了只在原始碼能過的檢查：在 Template 或任何 Log 裡，`tools/skill_lint.py`（`tools/checks_for.py` 的一個 `do` 指向 `docs/maintaining.md`）、`test_skill_lint`、`test_logfiles`（讀 `maintainer/`）、`test_checks_for`（要 `maintainer/tests/`）、`test_upgrade`（讀 `docs/upgrades/upgrade-next.*`、`upgrade-skeleton.*`）都 fail。(2) `tools/config.py set` 把新的 key 加在 `config.toml` 檔尾、沒有 `config.default.toml` 的註解（維護者升級時看到的）。要不要開、怎麼排，等使用者。
-- **不急的兩個（since 2026-11-22）：** 這個 repo 要不要關 blank issue；`maintainer/tests/` 裡 #18 的 guard 測試要不要掛進 `tools/checks_for.py` 的 map。
-- **做完的 lane session 還沒 archive（since 2026-11-23）：** 拆分的十三條 lane（private repo 的 819、820、830、827，和這個 repo 的 821–825、e7、e8、e14、e18），照 relay 的 `close-out.md`，使用者說 yes 才 archive。這個 repo 的 `.claude/worktrees/` 下還有那些 lane 的 worktree。
+- **第一輪 lane（since 2026-11-23）：** 要不要開工、開哪些、merge right，等使用者。
 
 ## Deadlines
 
