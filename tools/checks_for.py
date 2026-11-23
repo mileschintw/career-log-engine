@@ -225,7 +225,7 @@ GROUPS = [
     ]),
     ("prepush", "coord-tests.yml", [
         "maintainer/prepush.py", "maintainer/hooks/pre-push", "maintainer/tests/test_prepush.py",
-        "tools/deny_coverage.py",
+        "tools/deny_coverage.py", "tools/export-template.sh",
     ], [
         py("maintainer/tests/test_prepush.py"),
     ]),
