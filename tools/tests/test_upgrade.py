@@ -372,8 +372,8 @@ class Upgrade(unittest.TestCase):
 
     def test_engine_updates_the_unedited_sections_after_the_entries_section(self):
         """The owner's text above the entries heading and the entry rows stay; the Template's sections
-        after them, unedited, become the release's, in the page's own line ends."""
-        mine = "# My log\n\nMy own words.\n\n## Entries\n\n| Entry |\n|---|\n| [mine](entries/2026-01-x.md) |\n\n"
+        after them, unedited, become the release's, in the page's own line ends and byte order mark."""
+        mine = "﻿# My log\n\nMy own words.\n\n## Entries\n\n| Entry |\n|---|\n| [mine](entries/2026-01-x.md) |\n\n"
         log, out = self.upgrade_front_page({"README.md": (mine + self.AFTER[0]).replace("\n", "\r\n")},
                                            self.AFTER, self.ZH_AFTER)
         self.assertIn("done: README.md after its `## Entries` section: the Template's text, unedited, now 0.4.0's", out)
@@ -408,16 +408,23 @@ class Upgrade(unittest.TestCase):
         with open(os.path.join(log, "README.md"), encoding="utf-8", newline="") as f:
             self.assertTrue(f.read().endswith("| Entry |\n|---|\n"))
 
-    def test_engine_is_silent_on_sections_after_the_entries_section_the_release_keeps(self):
-        """Edited or not, nothing to say when the Template's text there did not change, or when the owner
-        already has the release's."""
+    def test_engine_is_silent_on_edited_sections_the_release_keeps(self):
+        """Nothing to say when the Template's text after the entries section did not change."""
         top = "# career-log\n\nStart with setup.\n\n## Entries\n\n| Entry |\n|---|\n\n"
         log, out = self.upgrade_front_page({"README.md": top + "## Mine\n\nedited\n"})
         self.assertFalse([l for l in out if " after its " in l or l.startswith("review:")], out)
-        rmtree(self.tmp)   # a fresh Template: its 0.3.2 and 0.4.0 tags are taken
-        self.setUp()
+
+    def test_engine_is_silent_when_the_owner_has_the_releases_sections(self):
+        top = "# career-log\n\nStart with setup.\n\n## Entries\n\n| Entry |\n|---|\n\n"
         log, out = self.upgrade_front_page({"README.md": top + self.AFTER[1]}, self.AFTER)
         self.assertFalse([l for l in out if l.startswith("review:") or "README.md after" in l], out)
+
+    def test_page_parts_ends_the_entries_section_at_a_heading_outside_a_code_fence(self):
+        page = "# Log\r\n## Entries\r\n| a |\r\n```\r\n## not a heading\r\n```\r\n### Sub\r\n##  End\r\nMIT\r\n"
+        self.assertEqual(upgrade.page_parts(page.encode("utf-8"), "Entries"), (
+            "# Log\n", "## Entries\n| a |\n```\n## not a heading\n```\n### Sub\n", "##  End\nMIT\n"))
+        self.assertEqual(upgrade.page_parts(b"# Log\n## Entries", "Entries"), ("# Log\n", "## Entries", ""))
+        self.assertIsNone(upgrade.page_parts(b"# Log\n", "Entries"))
 
     def test_clean(self):
         log = self.log()
