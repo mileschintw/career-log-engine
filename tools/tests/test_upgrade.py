@@ -12,9 +12,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 REPO = os.path.dirname(TOOLS)
 TOOL = os.path.join(TOOLS, "upgrade.py")
-# The Template's source, the one root with maintainer/, alone has upgrade-skeleton.* and upgrade-next.*
-# (which only a Dev build ships): a Template or a Log skips the tests that read them (#33). A Template
-# exported to a folder is no git repo yet: it skips the tests that read this repo's commits.
+# The Template's source, the one root with maintainer/, alone has upgrade-skeleton.*, and upgrade-next.*
+# but in a Dev build: a Template or a Log skips the tests that read them (#33). A Template exported to
+# a folder is no git repo yet: it skips the tests that read this repo's commits.
 SOURCE = os.path.isdir(os.path.join(REPO, "maintainer"))
 NOT_SOURCE = "not the Template's source: no maintainer/"
 GIT = os.path.exists(os.path.join(REPO, ".git"))
@@ -772,7 +772,7 @@ def migrated_log(tmp):
     return log
 
 
-@unittest.skipUnless(SOURCE, NOT_SOURCE)
+@unittest.skipUnless(os.path.isfile(NEXT_SCRIPT), "no upgrade-next.py: the source's, which only a Dev build ships")
 class NextGuide(unittest.TestCase):
     """Guide cases: the pending guide, docs/upgrades/upgrade-next.*, can be run again on a Log it
     already migrated (ADR 0015: a Log that follows dev builds runs it on each of them)."""
@@ -783,6 +783,7 @@ class NextGuide(unittest.TestCase):
     def tearDown(self):
         rmtree(self.tmp)
 
+    @unittest.skipUnless(GIT, NOT_GIT)
     def test_next_guide_runs_again_on_a_migrated_log(self):
         log = migrated_log(self.tmp)
         self.assertEqual(run_again(log), [])

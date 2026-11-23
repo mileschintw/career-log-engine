@@ -164,7 +164,7 @@ class Typical(unittest.TestCase):
             "tools/tests/test_config.py", "tools/tests/test_check.py", "tools/tests/test_speech.py",   # speech.py imports logfiles (#773)
             "tools/tests/test_resume.py", "tools/tests/test_guide.py", "tools/tests/test_skill_lint.py", "tools/skill_lint.py", "tools/tests/test_scan.py",
             "tools/tests/test_fit.py", "tools/tests/test_dashboard.py", "tools/tests/test_sponsorship.py", "tools/tests/test_perplexity.py",
-            "tools/tests/test_upgrade.py"] + ["maintainer/tests/test_harness.py"] * SOURCE + [
+            "tools/tests/test_upgrade.py"] + (["maintainer/tests/test_harness.py"] if SOURCE else []) + [
             "tools/tests/test_writing_lint.py", "tools/tests/test_application.py",
             "tools/tests/test_sync.py"])
 

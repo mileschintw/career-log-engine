@@ -53,15 +53,26 @@ def export(scratch):
             "commit", "-q", "-m", "Initial commit")
     except subprocess.CalledProcessError as e:
         raise RuntimeError("git in the export: %s" % (e.stderr or b"").decode("utf-8", "replace").strip())
+    except OSError as e:   # no git on PATH
+        raise RuntimeError("git: %s" % e)
     return out
 
 
 def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows."""
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
-    shutil.rmtree(path, onerror=retry)
+    """shutil.rmtree that also removes git's read-only object files on Windows, and takes a file
+    already gone as removed (maintainer/devbuild.py's; #24 makes one helper of them)."""
+    def retry(func, p, exc):
+        if isinstance(exc, FileNotFoundError) or (isinstance(exc, tuple) and exc[0] is FileNotFoundError):
+            return
+        try:
+            os.chmod(p, 0o700)
+            func(p)
+        except FileNotFoundError:
+            pass
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=retry)
+    else:
+        shutil.rmtree(path, onerror=retry)
 
 
 def scripts(template):

@@ -235,8 +235,14 @@ class SkillLint(unittest.TestCase):
         ])
 
     def test_exported_path_missing_in_a_template_fails(self):
-        self.assertEqual(sorted(self.lint("See `docs/guide.md › Start` and [adr](../../../docs/adr/0001-x.md).\n")),
-                         [(4, "docs/guide.md: no such file"), (4, "link ../../../docs/adr/0001-x.md: no such file")])
+        """An exported path, and a source-only one the skeleton ships (LICENSE, .github/ISSUE_TEMPLATE/)."""
+        skeleton = {"tools/template/.github/ISSUE_TEMPLATE/bug.yml": "", "tools/template/LICENSE": ""}
+        self.assertEqual(sorted(self.lint("See `docs/guide.md › Start` and [adr](../../../docs/adr/0001-x.md).\n"
+                                          "[form](../../../.github/ISSUE_TEMPLATE/bugs.yml) [l](../../../LICENSE)\n",
+                                          skeleton)),
+                         [(4, "docs/guide.md: no such file"), (4, "link ../../../docs/adr/0001-x.md: no such file"),
+                          (5, "link ../../../.github/ISSUE_TEMPLATE/bugs.yml: no such file"),
+                          (5, "link ../../../LICENSE: no such file")])
 
     def test_repo_skill_passes(self):
         """The skill in this repo passes the lint as committed."""

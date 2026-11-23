@@ -829,8 +829,7 @@ class TableHelpers(unittest.TestCase):
 
     def test_no_tool_reads_or_writes_a_table_by_hand(self):
         # maintainer/ is in the Template's source alone: a Template or a Log has none (#33)
-        folders = [f for f in ("tools", "maintainer", "skills/career-log") if f != "maintainer"
-                   or os.path.isdir(os.path.join(REPO, f))]
+        folders = [f for f in ("tools", "maintainer", "skills/career-log") if os.path.isdir(os.path.join(REPO, f))]
         paths = sorted(rel for folder in folders
                        for rel in (folder + "/" + name for name in os.listdir(os.path.join(REPO, *folder.split("/"))))
                        if rel.endswith(".py"))

@@ -30,8 +30,9 @@ modes/<mode>-<part>.md counts for <mode>).
 In docs/guide.md it also fails on a generated block that is stale or missing, or a bad row of the
 flows table (`tools/guide.py check`; `tools/guide.py write` regenerates the blocks).
 In a Template or a Log (a root without `maintainer/`), a missing file the export leaves out (a path
-under tools/checks_for.py's SOURCE_ENGINE, such as docs/maintaining.md) is not a problem: it is in
-the Template's source alone, where the lint checks it.
+under tools/checks_for.py's SOURCE_ENGINE, such as docs/maintaining.md, in a folder the skeleton in
+tools/template/ does not have) is not a problem: it is in the Template's source alone, where the
+lint checks it.
 <root> defaults to the repo this script is in. Standard library only, Python 3.11+.
 
 There is no list of problems to ignore: a new check that finds breaks fixes them in the same pull
@@ -193,9 +194,13 @@ class Linter:
         return None
 
     def exported(self, p):
-        """False for a path the export leaves out, in a Template or a Log; True otherwise."""
+        """False for a path the export leaves out, in a Template or a Log; True otherwise. A path of
+        SOURCE_ENGINE whose folder the skeleton (tools/template/) has, such as LICENSE or
+        .github/ISSUE_TEMPLATE/, ships from there."""
         rel = os.path.relpath(p, self.root).replace(os.sep, "/")
-        return not any(rel.startswith(t) if t.endswith("/") else rel == t for t in self.left_out)
+        if not any(rel.startswith(t) if t.endswith("/") else rel == t for t in self.left_out):
+            return True
+        return os.path.isdir(os.path.join(self.root, "tools", "template", *rel.split("/")[:-1]))
 
     def target(self, here, path, lineno, m):
         if m.group("href"):
