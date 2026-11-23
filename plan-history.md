@@ -14,3 +14,13 @@ Finished work moved out of `plan.md`, oldest first (append each block at the end
 - 兩張新 issue 都開：匯出檢查在 Template 和 Log 裡 fail（高優先）、`config.py set` 的新欄位位置（#31，低優先）。
 - 關 blank issue 和 #18 的 guard 測試掛進 `checks_for.py`，併成一張（#32）。
 - archive 拆分的 13 個 lane session（819、820、830、827、821–825、e7、e8、e14、e18）：已 archive；worktree 都乾淨、沒有沒 push 的 commit，共用筆記資料夾是空的。刪掉 8 條已 merge 的遠端 `claude/lane-*` 分支：已刪。
+
+## 第一輪 merge：e15、e21、e27、e31（2026-11-23 15:37 -0800，coordinator engine-coordinator-b9a6ad）
+
+PR #38（#15）、#39（#21）、#40（#27）、#41（#31）CI 過後依第一輪 merge right merge；master 的 push run（Dev build）在 43201d0c 成功。各 lane 的 Now 列：
+
+| e15 | pr | #15 | local_c068efcd-7d35-45a8-a8de-e767f7bb9f52（落在已 archive 的 `.claude/worktrees/lane-e14-296d3a`，分支 `claude/lane-e15-*`） | PR #38 open, waitchecks | — |
+| e21 | pr | #21 | local_6dca5a18-ff19-4fdd-91bb-7b06a4b65673（落在已 archive 的 `.claude/worktrees/lane-e7-af6541`，分支 `claude/lane-e21-*`） | PR #39 open, waitchecks | — |
+| e27 | pr | #27 | local_2b4f703a-dc6d-449b-b5ec-c27e246311a5（使用者按卡片開；落在已 archive 的 `.claude/worktrees/lane-824-c07deb`，分支 `claude/keen-hellman-848c87`） | PR #40 open, waitchecks | — |
+| e31 | pr | #31 | local_de73c331-cd14-4bfa-862c-705c4a6a065b（卡片；落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/xenodochial-grothendieck-a9c012`） | PR #41 open, waitchecks | — |
+
