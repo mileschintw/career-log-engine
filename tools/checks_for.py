@@ -213,6 +213,8 @@ GROUPS = [
     ]),
     ("coord", "coord-tests.yml", [
         "maintainer/coord.py", "maintainer/tests/test_coord.py", "tools/export-template.sh", "tools/deny_coverage.py",
+        # its OneExportRunner reads every maintainer/*.py: a new one goes here too
+        "maintainer/devbuild.py", "maintainer/harness.py", "maintainer/prepush.py",
     ], [
         py("maintainer/tests/test_coord.py"),
     ]),
