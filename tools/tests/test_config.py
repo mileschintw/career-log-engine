@@ -161,11 +161,89 @@ class ConfigTest(unittest.TestCase):
         with open(os.path.join(self.root, "config.toml"), "rb") as f:
             self.assertEqual(tomllib.load(f)["record_language"], "繁體中文")
 
-    def test_set_appends_a_field_left_out(self):
-        self.write('record_language = "English"\n')
-        code, lines = self.run_tool("set", "interviewer_profiles", "always")
-        self.assertEqual(lines[0], 'before: interviewer_profiles = "never" (default)')
-        self.assertEqual(self.read(), 'record_language = "English"\ninterviewer_profiles = "always"\n')
+    # ---- A field the file leaves out goes where the defaults file has it (#31) ----
+
+    def defaults_text(self):
+        with open(config.DEFAULTS_FILE, encoding="utf-8") as f:
+            return f.read()
+
+    def comment_above(self, field):
+        """The comment lines of the defaults file's paragraph that holds field, read in the test's own
+        way: a field that shares a paragraph shares its comment."""
+        lines = self.defaults_text().splitlines()
+        i = next(k for k, l in enumerate(lines) if l.startswith(field + " ="))
+        top = i
+        while top and lines[top - 1].strip():
+            top -= 1
+        comment = "".join(l + "\n" for l in lines[top:i] if l.startswith("#"))
+        self.assertTrue(comment, field)
+        return comment
+
+    def test_set_places_a_missing_middle_field_with_its_comment(self):
+        self.run_tool("init")
+        full = self.read()
+        block = self.comment_above("conversation_language") + 'conversation_language = ""\n\n'
+        self.assertIn(block, full)
+        self.write(full.replace(block, ""))
+        code, lines = self.run_tool("set", "conversation_language", "zh-Hant-TW")
+        self.assertEqual((code, lines[0], lines[-1]), (0, 'before: conversation_language = "" (default)', "written"))
+        self.assertEqual(self.read(), full.replace('conversation_language = ""', 'conversation_language = "zh-Hant-TW"'))
+
+    def test_set_places_a_missing_first_field_at_the_top(self):
+        self.run_tool("init")
+        full = self.read()
+        block = self.comment_above("record_language") + 'record_language = "English"\n\n'
+        self.assertIn(block, full)
+        self.write(full.replace(block, ""))
+        self.assertEqual(self.run_tool("set", "record_language", "Deutsch")[1][-1], "written")
+        self.assertEqual(self.read(), full.replace('record_language = "English"', 'record_language = "Deutsch"'))
+
+    def test_set_places_a_missing_field_among_the_users_own_comments(self):
+        mine = ('# My settings, kept short.\n'
+                'record_language = "English"\n'
+                '# I like a long look back.\n'
+                'window = 30\n'
+                '\n'
+                '# Never ask GitHub.\n'
+                'update_check = "off"\n')
+        self.write(mine)
+        self.assertEqual(self.run_tool("set", "interviewer_profiles", "always")[1][-1], "written")
+        self.assertEqual(self.read(), mine.replace(
+            'record_language = "English"\n',
+            'record_language = "English"\n\n' + self.comment_above("interviewer_profiles")
+            + 'interviewer_profiles = "always"\n\n'))
+        self.write(mine)   # a field of window's group goes right under window, its comment already above
+        self.assertEqual(self.run_tool("set", "scheduled_window", "3")[1][-1], "written")
+        self.assertEqual(self.read(), mine.replace("window = 30\n", "window = 30\nscheduled_window = 3\n"))
+        self.write(mine)   # the last field: after update_check, the end of the file
+        self.assertEqual(self.run_tool("set", "plan_preview", "never")[1][-1], "written")
+        self.assertEqual(self.read(), mine + "\n" + self.comment_above("plan_preview") + 'plan_preview = "never"\n')
+        self.write(mine)   # a field that shares its paragraph's comment, none of the paragraph in the file
+        self.assertEqual(self.run_tool("set", "fit_budget", "9")[1][-1], "written")
+        self.assertEqual(self.read(), mine.replace("window = 30\n", "window = 30\n\n" + self.comment_above("fit_budget")
+                                                   + "fit_budget = 9\n"))
+        self.write("# Only a note so far.\n")   # no field at all: at the end
+        self.assertEqual(self.run_tool("set", "m", "6")[1][-1], "written")
+        self.assertEqual(self.read(), "# Only a note so far.\n\n" + self.comment_above("m") + "m = 6\n")
+
+    def test_every_field_left_out_of_an_init_file_comes_back_in_place(self):
+        """Each field's line (its comment too, when it is alone under it) taken out of init's file,
+        then placed back: the file init wrote, line for line."""
+        full = self.defaults_text()
+        lines = full.splitlines()
+        for field in config.FIELDS:
+            with self.subTest(field=field):
+                i = next(k for k, l in enumerate(lines) if l.startswith(field + " ="))
+                last = i + 1 == len(lines)
+                if lines[i - 1].startswith("#") and (last or not lines[i + 1]):   # alone in its paragraph
+                    top = i - self.comment_above(field).count("\n")
+                    if last:   # the paragraph and the blank line above it
+                        cut = lines[:top - 1]
+                    else:      # the paragraph and the blank line below it
+                        cut = lines[:top] + lines[i + 2:]
+                else:          # the line alone
+                    cut = lines[:i] + lines[i + 1:]
+                self.assertEqual(config.placed("".join(l + "\n" for l in cut), field, lines[i]), full)
 
     def test_interviewer_profiles_notice(self):
         self.write('record_language = "English"\n')
@@ -187,7 +265,8 @@ class ConfigTest(unittest.TestCase):
             code, lines = self.run_tool("set", "plan_preview", value)
             self.assertEqual(code, 1, value)
             self.assertTrue(lines[0].startswith("config: "), lines)
-        self.assertEqual(self.read(), 'record_language = "English"\nplan_preview = "ask"\n')
+        self.assertEqual(self.read(), 'record_language = "English"\n\n' + self.comment_above("plan_preview")
+                         + 'plan_preview = "ask"\n')
 
     def test_dry_run_writes_nothing(self):
         self.run_tool("init")
@@ -679,7 +758,7 @@ class ConfigTest(unittest.TestCase):
             self.assertTrue(lines[0].endswith("(default)"), lines)
         self.assertEqual(self.read(), 'record_language = "English"\n')
         self.assertEqual(self.run_tool("set", "m", "6")[1][-1], "written")   # another value still is written
-        self.assertEqual(self.read(), 'record_language = "English"\nm = 6\n')
+        self.assertEqual(self.read(), 'record_language = "English"\n\n' + self.comment_above("m") + "m = 6\n")
 
     def test_set_refuses_unknown_names_and_values(self):
         self.run_tool("init")

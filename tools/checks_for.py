@@ -174,6 +174,8 @@ GROUPS = [
         "entries/_template.md", "docs/adr/", "docs/guide.md", "tools/guide.py", "tools/config.py",
         "tools/config.default.toml", "tools/logfiles.py", "tools/skill_lint.py", "tools/tests/test_guide.py",
         "tools/tests/test_skill_lint.py",
+        # the repos' addresses (#23): the constants, the export's ALLOW list it scans, the maintainer docs
+        "tools/upgrade.py", "tools/export-template.sh", "docs/publishing.md", "docs/maintaining.md",
     ], [
         py("tools/tests/test_guide.py"),
         py("tools/tests/test_skill_lint.py"),
@@ -220,11 +222,13 @@ GROUPS = [
     ]),
     ("coord", "coord-tests.yml", [
         "maintainer/coord.py", "maintainer/tests/test_coord.py", "tools/export-template.sh", "tools/deny_coverage.py",
+        "tools/upgrade.py",
     ], [
         py("maintainer/tests/test_coord.py"),
     ]),
     ("dev build", "coord-tests.yml", [
         "maintainer/devbuild.py", "maintainer/tests/test_devbuild.py", "maintainer/coord.py", "tools/export-template.sh",
+        "tools/upgrade.py",
     ], [
         py("maintainer/tests/test_devbuild.py"),
     ]),

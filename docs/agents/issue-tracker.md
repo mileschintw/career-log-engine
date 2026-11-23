@@ -12,6 +12,8 @@ This repo's issues are GitHub Issues on its GitHub repo (the `origin` remote), r
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`; the labels are in [triage-labels.md](triage-labels.md).
 - **Close**: `gh issue close <number> --comment "..."`
 
+**Files section:** an issue that will become a lane ends with a `## Files` section, one bullet per file it will touch: `- path/to/file (short scope)`, with `New:` before a file it creates. relay reads it to fill its roadmap and to tell which lanes can run in parallel, so list the paths here even when the rest of the ticket stays free of them.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: yes.** _(`/triage` reads this flag.)_ The Template's front page asks its users to send pull requests here, and [publishing.md](../publishing.md) triages them from `needs-triage` like an issue.
