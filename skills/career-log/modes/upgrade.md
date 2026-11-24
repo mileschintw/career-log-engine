@@ -17,7 +17,7 @@ Placeholders: `<root>` is the Log's root, `<py>` is `python3` (`py -3` on Window
    ```
    The last line prints the newest release's ref (`refs/career-log-upgrade/v<version>`); for a version the user named, the ref is `refs/career-log-upgrade/v<that version>`.
 
-   **A Dev build** is a target only when the user names one, by its version (`0.4.1-dev.3`: a build of the Engine repo between releases, on its way to `0.4.1`). Tell the user that no Dev build is promised stable, and that the newest release stays the default. The Dev builds' tags are at the Engine repo, not the Template; to list them, or to fetch the named one:
+   **A Dev build** is a target only when the user names one, by its version (`0.4.1-dev.3`: a build of the Engine repo between releases, on its way to `0.4.1`). The Dev builds' tags are at the Engine repo, not the Template; to list them, or to fetch the named one:
    ```
    git -C <root> ls-remote --tags https://github.com/mileschintw/career-log-engine.git "v*-dev.*"
    git -C <root> fetch --no-tags https://github.com/mileschintw/career-log-engine.git "+refs/tags/v*:refs/career-log-upgrade/engine/v*"
@@ -55,9 +55,11 @@ Tell the user, in one message: the versions from and to, each step, and what hap
 - `dropped:` files are Engine files the new release no longer has: a step deletes them (an edited one shows again in step 4).
 - The Log's own `.gitignore` lines are put back after each step, with no question.
 
-When `to:` is a Dev build (`<version>-dev.<n>`), the same message also says that no Dev build is promised stable and that the newest release stays the default. Say it here even when step 1 did: a Log older than 0.4.1 ran step 1 from its own text, which does not say it.
+When `to:` is a Dev build (`<version>-dev.<n>`), the same message also says that no Dev build is promised stable and that the newest release stays the default, once per upgrade: when you already told the user so in this upgrade (a Log's own, older step 1 may say it), this message leaves it out.
 
-Done when the user has said yes to the plan, or the mode has ended at `OK:` or a `stop:` the user chose not to settle now.
+End your turn on that question, and wait for the user's reply to it.
+
+Done when the user has replied yes to the plan message, or the mode has ended at `OK:` or a `stop:` the user chose not to settle now. Their request came before the plan, so it is no yes to it, even when it names the target or says they know a Dev build is not promised stable.
 
 ## 3. One release at a time
 
