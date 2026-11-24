@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23 16:49 -0800）：** 第一輪九條 lane 全部 merge（#38–#45、#47）。沒有 lane、沒有鬧鐘。等使用者：下一輪排什麼（#37、#46、#24 等）、要不要 archive 第一輪的九個 session、要不要寫 Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
+- **Next（2026-11-23 16:49 -0800）：** 第一輪九條 lane 全部 merge（#38–#45、#47）。沒有 lane、沒有鬧鐘。等使用者：下一輪排什麼（#37、#46、#24 等）、要不要寫 Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -53,7 +53,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第一輪結束後（since 2026-11-23 16:49 -0800）：** 下一輪（建議 #46、#37 triage 後、#24）；archive 第一輪九個 lane session；Log 升到最新 Dev build 的 prompt；e27 提的「step 1 的 Dev build 警告要不要刪」要不要開 issue。
+- **第一輪結束後（since 2026-11-23 16:49 -0800）：** 下一輪（建議 #46、#37 triage 後、#24）；Log 升到最新 Dev build 的 prompt；e27 提的「step 1 的 Dev build 警告要不要刪」要不要開 issue。
 
 ## Deadlines
 
