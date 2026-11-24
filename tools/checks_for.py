@@ -35,7 +35,9 @@ everything under it, or a path with `*` for any characters but `/`, as a workflo
 it) and the checks it runs. A group with a workflow is what that workflow in
 this repo's .github/workflows/ runs, on the same `paths:`, the workflow's own file included; groups
 that share a workflow are run together by it, on all their `paths:`. tools/tests/test_checks_for.py
-fails when a workflow and its groups disagree. A new tool or test: add its group here, and in the
+fails when a workflow and its groups disagree, and when a repo module a check imports (directly or
+through other repo modules, by an import or loaded by path) is in no trigger of the groups that run
+it or no `paths:` of their workflows (#52). A new tool or test: add its group here, and in the
 Template's source a workflow for it with the same `paths:` plus its own file, or name a workflow
 whose `paths:` it mostly shares and add its paths and steps there. A check whose script is missing (maintainer/
 in a Template) is left out, and so is a do: step that names a missing file (docs/upgrades/test-next.sh
@@ -100,6 +102,7 @@ GROUPS = [
     ("chat export", "parser-tests.yml", [
         "tools/chat_export.py", "tools/tests/test_chat_export.py", "tools/tests/make_fixtures.py",
         "tools/tests/fixtures/", "tools/tests/expected/", "tools/logfiles.py",
+        "tools/entries.py",   # test_chat_export.py loads it
     ], [
         py("tools/tests/test_chat_export.py", CHAT_EXPORT_PY),
     ]),
@@ -107,7 +110,7 @@ GROUPS = [
         "tools/check_run.py", "tools/tests/test_check_run.py", "tools/check_save.py", "tools/tests/test_check_save.py",
         "tools/chat_export.py", "tools/entries.py", "tools/logfiles.py", "tools/writing_lint.py", "tools/resume.py",
         "tools/config.py", "tools/config.default.toml", "tools/fit.py", "tools/sponsorship.py", "tools/dashboard.py",
-        "tools/sync.py", "skills/career-log/writing.md", "skills/career-log/modes/review.md", "skills/career-log/modes/scan.md",
+        "tools/sync.py", "tools/scan.py", "skills/career-log/writing.md", "skills/career-log/modes/review.md", "skills/career-log/modes/scan.md",
     ], [
         py("tools/tests/test_check_run.py"),
         py("tools/tests/test_check_save.py"),
@@ -137,6 +140,9 @@ GROUPS = [
         "tools/config.py", "tools/config.default.toml", "tools/tests/test_check.py",
         "tools/guide.py", "docs/guide.md", "skills/career-log/SKILL.md", "skills/career-log/start.py",
         "tools/setup.sh", "tools/setup.ps1",
+        # check.py loads these by name (tools_module), and what they import (#52)
+        "tools/application.py", "tools/check_save.py", "tools/writing_lint.py", "tools/fit.py", "tools/scan.py",
+        "tools/dashboard.py", "tools/sponsorship.py",
     ], [
         py("tools/tests/test_check.py", CHECK_PY),
     ]),
@@ -211,7 +217,8 @@ GROUPS = [
     ]),
     ("upgrade", "upgrade-tests.yml", [
         "tools/upgrade.py", "tools/tests/test_upgrade.py", "tools/export-template.sh", "docs/upgrades/",
-        "tools/config.py", "tools/logfiles.py",
+        "tools/config.py", "tools/logfiles.py", "tools/checks_for.py",   # test_upgrade.py loads checks_for.py
+        "tools/entries.py",   # and docs/upgrades/upgrade-0.4.0.py, which loads it
     ], [
         py("tools/tests/test_upgrade.py"),
     ]),
@@ -222,21 +229,23 @@ GROUPS = [
            "upgrade mode; its header says how (docs/maintaining.md › Log format changes)" % NEXT_TEST, NEXT_TEST),
     ]),
     # The guards of test_coord.py (OneExportRunner) and test_devbuild.py (OneVersionForm) read every
-    # maintainer/*.py, so both groups take them all, a new one too (#46)
+    # maintainer/*.py, so both groups take them all, a new one too (#46); and the tools they import (#52)
     ("coord", "coord-tests.yml", [
         "maintainer/*.py", "maintainer/tests/test_coord.py", "tools/export-template.sh", "tools/deny_coverage.py",
-        "tools/upgrade.py",
+        "tools/upgrade.py", "tools/logfiles.py",
     ], [
         py("maintainer/tests/test_coord.py"),
     ]),
     ("dev build", "coord-tests.yml", [
         "maintainer/*.py", "maintainer/tests/test_devbuild.py", "tools/export-template.sh", "tools/upgrade.py",
+        "tools/logfiles.py", "tools/tests/test_logfiles.py",   # OneVersionForm loads test_logfiles.py
     ], [
         py("maintainer/tests/test_devbuild.py"),
     ]),
     ("prepush", "coord-tests.yml", [
         "maintainer/prepush.py", "maintainer/hooks/pre-push", "maintainer/tests/test_prepush.py",
         "tools/deny_coverage.py", "tools/export-template.sh",
+        "tools/logfiles.py", "tools/entries.py", "tools/sync.py",   # deny_coverage.py imports them
     ], [
         py("maintainer/tests/test_prepush.py"),
     ]),
@@ -247,7 +256,7 @@ GROUPS = [
     ]),
     ("harness", "harness-tests.yml", [
         "maintainer/harness.py", "maintainer/tests/test_harness.py", "tools/logfiles.py", "tools/config.py",
-        "tools/config.default.toml",
+        "tools/config.default.toml", "tools/chat_export.py",   # test_harness.py imports it
     ], [
         py("maintainer/tests/test_harness.py"),
     ]),
@@ -260,6 +269,7 @@ GROUPS = [
     ("application", "application-tests.yml", [
         "tools/application.py", "tools/entries.py", "tools/logfiles.py", "tools/check_save.py",
         "tools/writing_lint.py", "tools/resume.py", "tools/tests/test_application.py",
+        "tools/config.py", "tools/fit.py", "tools/sponsorship.py", "tools/dashboard.py", "tools/scan.py",
     ], [
         py("tools/tests/test_application.py"),
     ]),
@@ -269,7 +279,7 @@ GROUPS = [
         py("tools/tests/test_sync.py"),
     ]),
     ("checks_for", "checks-for-tests.yml", [
-        "tools/checks_for.py", "tools/tests/test_checks_for.py", EXPORT, ".github/workflows/",
+        "tools/checks_for.py", "tools/tests/test_checks_for.py", EXPORT, ".github/workflows/", "tools/logfiles.py",
     ], [
         py("tools/tests/test_checks_for.py"),
     ]),

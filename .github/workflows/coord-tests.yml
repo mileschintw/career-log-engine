@@ -1,7 +1,9 @@
 # Runs the tests of the maintainer's coordination tools (maintainer/coord.py: blocked-by marks and a
 # Template release's staging; maintainer/devbuild.py: a Dev build; .github/workflows/closing_refs.py's
 # check; maintainer/prepush.py, the pre-push check against the deny list). The guards of test_coord.py
-# and test_devbuild.py read every maintainer/*.py, so paths: takes them all, a new one too (#46).
+# and test_devbuild.py read every maintainer/*.py, so paths: takes them all, a new one too (#46);
+# it also takes each tool the tests import, directly or through another (tools/logfiles.py, and
+# tools/deny_coverage.py's own imports), which tools/tests/test_checks_for.py's EveryImport checks (#52).
 # Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11). Its Windows code
 # (Git for Windows' sh) is left to the session that changes it, which runs these tests on the
 # maintainer's own machine (SETUP.md step 7): Windows took four minutes here, billed twice (the
@@ -23,6 +25,10 @@ on:
       - ".github/workflows/closing_refs.py"
       - "tools/deny_coverage.py"
       - "tools/upgrade.py"
+      - "tools/logfiles.py"
+      - "tools/entries.py"
+      - "tools/sync.py"
+      - "tools/tests/test_logfiles.py"
       - ".github/workflows/coord-tests.yml"
 
 permissions:

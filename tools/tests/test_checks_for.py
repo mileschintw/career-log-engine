@@ -10,8 +10,16 @@ The parity test compares the steps that run a test or a script: `python -I <scri
 `sh -n <script>`, the PowerShell parse of `Resolve-Path <script>`, and tools/export-template.sh,
 and fails on a run: line naming python, sh or the like in any other form, and on a path filter
 other than `paths:` under `pull_request:`.
+
+EveryImport (#52) reads each py check's imports with ast, through every repo module they reach:
+import statements anywhere in a file (resolved beside it, then in tools/), and modules loaded by
+path or name (spec_from_file_location, import_module, __import__). It fails on a module no group
+running the check has among its triggers (LEFT_OUT lists the rightful exceptions), or that their
+workflows' paths: lack, and on a load whose path or name it cannot tell, unless UNTOLD names what
+that load loads; a path joined under a folder it cannot tell (a Log's root) is read as under this
+repo's. Standard and third-party modules and a script run as a subprocess are left out.
 """
-import contextlib, importlib.util, io, os, re, shutil, subprocess, sys, tempfile, time, unittest
+import ast, contextlib, importlib.util, io, os, re, shutil, subprocess, sys, tempfile, time, unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -130,6 +138,261 @@ def compare(groups, name, text, root=REPO):
     return problems
 
 
+def dotted(node):
+    """`os.path.join` for the expression os.path.join, None for anything but names and attributes."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        head = dotted(node.value)
+        return head and head + "." + node.attr
+    return None
+
+
+# A path joined under a folder value() cannot tell (a Log's root, a test's scratch copy of one), as
+# value() gives it: reads() takes it as under this repo's root, whose tools/ a Log's are, when a
+# file is there, and as untold when none is (under_root())
+UNDER = "\0root/"
+
+
+def value(node, env, path):
+    """A string expression's value, from constants, names in env, `__file__` (path), `+` and
+    os.path.join, dirname, abspath, normpath and realpath; an os.path.join whose first part alone
+    it cannot tell, the rest under UNDER; None when it needs anything else."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return path if node.id == "__file__" else env.get(node.id)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        parts = [value(node.left, env, path), value(node.right, env, path)]
+        return None if None in parts else parts[0] + parts[1]
+    if isinstance(node, ast.Call) and not node.keywords and node.args:
+        args = [value(a, env, path) for a in node.args]
+        fn = dotted(node.func)
+        if fn == "os.path.join" and len(args) > 1 and args[0] is None and None not in args[1:]:
+            return UNDER + "/".join(args[1:])
+        if None in args:
+            return None
+        if fn == "os.path.join":
+            return os.path.join(*args)
+        if len(args) == 1 and fn in ("os.path.dirname", "os.path.abspath", "os.path.normpath", "os.path.realpath"):
+            under, rest = (UNDER, args[0][len(UNDER):]) if args[0].startswith(UNDER) else ("", args[0])
+            return under + (os.path.dirname(rest) if fn == "os.path.dirname" else os.path.normpath(rest))
+    return None
+
+
+def under_root(p, root):
+    """A path value() gave, with an UNDER path as the file under root it names; None (untold) when
+    that file is not there or UNDER is anywhere but at the start."""
+    if p is None or "\0" not in p:
+        return p
+    if not p.startswith(UNDER):
+        return None
+    p = os.path.normpath(os.path.join(root, p[len(UNDER):]))
+    return p if os.path.isfile(p) else None
+
+
+def loaded(rel, root=REPO):
+    """reads()'s modules alone."""
+    return reads(rel, root)[0]
+
+
+FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+
+
+def own(scope):
+    """The nodes of scope (a module or a function) outside the functions within it and outside its
+    own signature."""
+    inner = {id(m) for n in ast.walk(scope) if n is not scope and isinstance(n, FUNCTIONS) for m in ast.walk(n)}
+    if isinstance(scope, FUNCTIONS):
+        inner |= {id(m) for m in ast.walk(scope.args)}
+    return [n for n in ast.walk(scope) if id(n) not in inner]
+
+
+def parameters(function):
+    a = function.args
+    return [p.arg for p in a.posonlyargs + a.args + a.kwonlyargs + [a.vararg, a.kwarg] if p]
+
+
+def constants(nodes, env, path):
+    """env, less every name nodes bind, plus each name they bind once, by `name = <value>`, whose
+    value value() can tell, in the order of the source."""
+    bound = {}
+    for n in nodes:
+        if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)):
+            bound[n.id] = bound.get(n.id, 0) + 1
+        elif isinstance(n, ast.alias):
+            bound[(n.asname or n.name).split(".")[0]] = 2
+        elif isinstance(n, ast.arg):   # a lambda's or a comprehension's
+            bound[n.arg] = 2
+    env = {k: v for k, v in env.items() if k not in bound}
+    for n in sorted((n for n in nodes if isinstance(n, ast.Assign)), key=lambda n: (n.lineno, n.col_offset)):
+        target = n.targets[0]
+        if len(n.targets) == 1 and isinstance(target, ast.Name) and bound[target.id] == 1:
+            got = value(n.value, env, path)
+            if got is not None:
+                env[target.id] = got
+    return env
+
+
+def reads(rel, root=REPO):
+    """(modules, untold): the repo modules the Python file rel (repo-relative) loads itself, as
+    repo-relative paths: those its import statements name (anywhere in the file), resolved in its
+    own folder, then in tools/, where every file that imports a tool puts it on sys.path; and those
+    it loads by path or by name (importlib.util.spec_from_file_location, importlib.import_module,
+    __import__), whose argument value() can tell with the file's constants and the function's own,
+    and, in a function the file calls by name (`f(...)`, `self.f(...)`), with each call's arguments
+    for the parameters, one call at a time. A name bound more than once, other than by
+    `name = <value>`, or by `global`, is no constant; a function passed on uncalled (`map(f, ...)`)
+    has a call whose arguments are not told. Anything else, a standard or third-party module
+    included, is not a repo module and is left out. untold: (rel, the argument's source) for each
+    load whose argument value() cannot tell for one of those calls: a module the guard may miss,
+    unless UNTOLD names it."""
+    path = os.path.join(root, rel)
+    with open(path, encoding="utf-8") as f:
+        source = f.read()
+    tree = ast.parse(source, rel)
+    shared = {n for node in ast.walk(tree) if isinstance(node, ast.Global) for n in node.names}
+    env = {k: v for k, v in constants(own(tree), {}, path).items() if k not in shared}   # HERE, TOOL and the like
+    functions = [n for n in ast.walk(tree) if isinstance(n, FUNCTIONS)]
+    base = {id(tree): env}   # each scope's constants, its parameters hiding the file's
+    for f in functions:
+        base[id(f)] = constants(own(f), {k: v for k, v in env.items() if k not in parameters(f)}, path)
+    named = {f.name for f in functions if not isinstance(f, ast.Lambda)}
+    calls = {}   # a function's name: the positional arguments value() tells of each call to it
+    for scope in [tree] + functions:
+        nodes = own(scope)
+        called = {id(n.func) for n in nodes if isinstance(n, ast.Call)}
+        for node in nodes:
+            target = node.func if isinstance(node, ast.Call) else node
+            if isinstance(target, ast.Name):
+                name, first = target.id, []
+            elif isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                name, first = target.attr, [None]   # self
+            else:
+                continue
+            if name not in named:
+                continue
+            if isinstance(node, ast.Call):
+                calls.setdefault(name, []).append(first + [value(a, base[id(scope)], path) for a in node.args])
+            elif id(node) not in called and isinstance(node.ctx, ast.Load):   # passed on, called elsewhere
+                calls.setdefault(name, []).append([])
+    paths, names, untold = set(), set(), []
+    for scope in [tree] + functions:
+        envs = [base[id(scope)]]
+        if scope is not tree and getattr(scope, "name", None) in calls:   # each call's arguments
+            positional = [p.arg for p in scope.args.posonlyargs + scope.args.args]
+            outer = {k: v for k, v in env.items() if k not in parameters(scope)}
+            envs = [constants(own(scope), dict(outer, **{p: a for p, a in zip(positional, args) if a is not None}), path)
+                    for args in calls[scope.name]]
+        for node in own(scope):
+            if isinstance(node, ast.Import):
+                names.update(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names.add(node.module.split(".")[0])
+            elif isinstance(node, ast.Call) and node.args:
+                fn = dotted(node.func) or ""
+                if fn.endswith("spec_from_file_location") and len(node.args) > 1:
+                    arg, into = node.args[1], paths
+                elif fn == "__import__" or fn.endswith("import_module"):
+                    arg, into = node.args[0], names
+                else:
+                    continue
+                got = [value(arg, e, path) for e in envs]
+                if into is paths:
+                    got = [under_root(g, root) for g in got]
+                into.update(g for g in got if g is not None)
+                if None in got:
+                    untold.append((rel, ast.get_source_segment(source, arg)))
+    out = set()
+    for p in paths:
+        p = os.path.relpath(os.path.normpath(os.path.join(os.path.dirname(path), p)), root).replace("\\", "/")
+        if p.endswith(".py") and not p.startswith("../") and os.path.isfile(os.path.join(root, p)):
+            out.add(p)
+    for n in names:
+        for folder in (os.path.dirname(rel), "tools"):
+            p = (folder + "/" if folder else "") + n.split(".")[0] + ".py"
+            if os.path.isfile(os.path.join(root, p)):
+                out.add(p)
+                break
+    out.discard(rel)
+    return out, untold
+
+
+# (file, argument): a load by path or name whose argument the guard cannot tell (reads()), and the
+# repo paths it loads, which the guard takes as imported (a folder ends in /: the modules in it). A
+# load not listed fails EveryImport; a listed one that is gone fails
+# test_the_lists_hold_only_what_is_there.
+UNTOLD = {
+    # the upgrade guide that holds #695's check, whichever release's it is
+    ("tools/tests/test_upgrade.py", 'os.path.join(REPO, "docs", "upgrades", name)'): ["docs/upgrades/"],
+}
+
+
+def imported(rel, root=REPO, untold=None, told=UNTOLD):
+    """rel and every repo module it loads, directly or through other repo modules (reads()), and
+    the paths told names for an untold load; each untold load, named in told or not, is appended to
+    untold when given."""
+    seen, todo = set(), [rel]
+    while todo:
+        p = todo.pop()
+        if p in seen:
+            continue
+        seen.add(p)
+        if p.endswith("/"):   # a folder told names: the modules in it
+            folder = os.path.join(root, p)
+            todo += sorted(p + n for n in os.listdir(folder) if n.endswith(".py")) if os.path.isdir(folder) else []
+            continue
+        modules, unknown = reads(p, root)
+        todo += modules
+        for load in unknown:
+            todo += told.get(load, [])
+        if untold is not None:
+            untold += unknown
+    return seen
+
+
+# (check, module): a module the check imports that its group's triggers in GROUPS rightly leave out,
+# with why; its workflow's paths: still take it. test_the_list_holds_only_gaps fails on a stale entry.
+LEFT_OUT = {
+    # template_checks.py runs every test again in a fresh export, so only its own script triggers it
+    # (#33); a change to either module runs that module's own tests, and template-scan.yml's paths:
+    # (the whole export, tools/ included) runs template_checks.py on it in CI
+    ("maintainer/template_checks.py", "tools/checks_for.py"): "runs every test again",
+    ("maintainer/template_checks.py", "tools/logfiles.py"): "runs every test again",
+}
+
+
+def import_gaps(groups, root=REPO, workflows=None, left_out=LEFT_OUT, told=UNTOLD):
+    """#52: each module a py check imports (imported()) that a change to would not run it: one no
+    group running that check has among its triggers (GROUPS), unless left_out lists it, or, given
+    workflows ({name: text}), none of those groups' workflows has in its paths:; and each load whose
+    module the guard cannot tell, unless told (UNTOLD) names it. A check whose script is not in root
+    (maintainer/ in a Template) is left out. [] when every module is covered."""
+    runners = {}
+    for g in groups:
+        for c in g[3]:
+            if c[0] == "py" and checks_for.present(c, root):
+                runners.setdefault(c[1], []).append(g)
+    problems = []
+    for script, gs in sorted(runners.items()):
+        names = ", ".join(g[0] for g in gs)
+        triggers = [t for g in gs for t in checks_for.triggers(g, root)]
+        flows = sorted({g[1] for g in gs if g[1] and workflows and g[1] in workflows})
+        paths = [p[:-2] if p.endswith("/**") else p for f in flows for p in workflow_paths(workflows[f])[0] or []]
+        untold = []
+        found = imported(script, root, untold, told)
+        problems += ["%s loads a module from %s's %s, which the guard cannot tell: make it a constant or "
+                     "os.path.join of the file's constants, or list it in UNTOLD with what it loads"
+                     % (script, f, arg) for f, arg in sorted(set(untold) - set(told))]
+        for module in sorted(found):
+            if (script, module) not in left_out and not any(checks_for.matches(module, t) for t in triggers):
+                problems.append("%s imports %s: no group that runs it (%s) has it in tools/checks_for.py GROUPS"
+                                % (script, module, names))
+            if flows and not any(checks_for.matches(module, p) for p in paths):
+                problems.append("%s imports %s: the paths: of %s lack it" % (script, module, ", ".join(flows)))
+    return problems
+
+
 class Typical(unittest.TestCase):
     """The checks for typical changes, as SETUP.md step 7 lists them."""
 
@@ -144,29 +407,38 @@ class Typical(unittest.TestCase):
         self.assertIn("tools/skill_lint.py", got)
 
     def test_scan(self):
+        # check_save.py imports dashboard.py, which imports scan.py; check.py and application.py load
+        # check_save.py (#52)
         self.assertEqual(scripts(runs(["tools/scan.py"])),
-                         ["tools/export-template.sh", "tools/tests/test_scan.py", "tools/tests/test_fit.py",
-                          "tools/tests/test_dashboard.py", "tools/tests/test_logfiles.py"])
+                         ["tools/export-template.sh", "tools/tests/test_check_run.py", "tools/tests/test_check_save.py",
+                          "tools/tests/test_check.py", "tools/tests/test_scan.py", "tools/tests/test_fit.py",
+                          "tools/tests/test_dashboard.py", "tools/tests/test_application.py",
+                          "tools/tests/test_logfiles.py"])
 
     def test_entries(self):
         # tools/logfiles.py is imported by every tool tools/entries.py is, and by tools/sync.py and
         # tools/config.py (which test_guide.py and test_upgrade.py load too), tools/resume.py and tools/chat_export.py
-        # (which test_perplexity.py loads)
-        # (tools/chat_export.py imports logfiles.py but not entries.py)
-        both = ["tools/tests/test_check_run.py",
+        # (which test_perplexity.py loads); test_chat_export.py loads entries.py itself, and
+        # maintainer/prepush.py imports deny_coverage.py, which imports both, and test_upgrade.py runs
+        # docs/upgrades/upgrade-0.4.0.py, which loads entries.py (#52)
+        both = ["tools/export-template.sh", "tools/tests/test_chat_export.py", "tools/tests/test_check_run.py",
                 "tools/tests/test_check_save.py", "tools/tests/test_deny_coverage.py", "tools/tests/test_logfiles.py",
                 "tools/tests/test_entries.py"]
-        self.assertEqual(scripts(runs(["tools/entries.py"])), ["tools/export-template.sh"] + both + [
+        self.assertEqual(scripts(runs(["tools/entries.py"])), both + [
             "tools/tests/test_check.py", "tools/tests/test_scan.py",
-            "tools/tests/test_fit.py", "tools/tests/test_dashboard.py", "tools/tests/test_writing_lint.py",
-            "tools/tests/test_application.py"])
-        self.assertEqual(scripts(runs(["tools/logfiles.py"])), ["tools/export-template.sh", "tools/tests/test_chat_export.py"] + both + [
+            "tools/tests/test_fit.py", "tools/tests/test_dashboard.py",
+            "tools/tests/test_upgrade.py"]   # through docs/upgrades/upgrade-0.4.0.py
+            + (["maintainer/tests/test_prepush.py"] if SOURCE else []) + [
+            "tools/tests/test_writing_lint.py", "tools/tests/test_application.py"])
+        self.assertEqual(scripts(runs(["tools/logfiles.py"])), both + [
             "tools/tests/test_config.py", "tools/tests/test_check.py", "tools/tests/test_speech.py",   # speech.py imports logfiles (#773)
             "tools/tests/test_resume.py", "tools/tests/test_guide.py", "tools/tests/test_skill_lint.py", "tools/skill_lint.py", "tools/tests/test_scan.py",
             "tools/tests/test_fit.py", "tools/tests/test_dashboard.py", "tools/tests/test_sponsorship.py", "tools/tests/test_perplexity.py",
-            "tools/tests/test_upgrade.py"] + (["maintainer/tests/test_harness.py"] if SOURCE else []) + [
+            "tools/tests/test_upgrade.py"]
+            + (["maintainer/tests/test_coord.py", "maintainer/tests/test_devbuild.py",   # #52
+                "maintainer/tests/test_prepush.py", "maintainer/tests/test_harness.py"] if SOURCE else []) + [
             "tools/tests/test_writing_lint.py", "tools/tests/test_application.py",
-            "tools/tests/test_sync.py"])
+            "tools/tests/test_sync.py", "tools/tests/test_checks_for.py"])
 
     def test_writing_md(self):
         # tools/writing_lint.py reads its word lists from writing.md
@@ -501,11 +773,9 @@ class Parity(unittest.TestCase):
             if g[1]:
                 groups.setdefault(g[1], []).append(g)
         problems = []
-        for name in sorted(os.listdir(WORKFLOWS)):
-            if not name.endswith(".yml") or name in NO_PATHS:
+        for name, text in sorted(read_workflows().items()):
+            if name in NO_PATHS:
                 continue
-            with open(os.path.join(WORKFLOWS, name), encoding="utf-8") as f:
-                text = f.read()
             if name not in groups:
                 problems.append("%s: no group in tools/checks_for.py GROUPS" % name)
                 continue
@@ -542,6 +812,226 @@ class Parity(unittest.TestCase):
         self.assertEqual(compare(group, name, chained), ["scan-tests.yml: a step the parity test cannot read: python tools/b.py"])
         push = text.replace("  pull_request:\n    paths:", "  pull_request:\n  push:\n    paths:")
         self.assertIn("scan-tests.yml: a path filter the map cannot hold: paths:", compare(group, name, push))
+
+
+def read_workflows():
+    """{name: text} of .github/workflows/*.yml, {} in a Template."""
+    if not os.path.isdir(WORKFLOWS):
+        return {}
+    out = {}
+    for name in os.listdir(WORKFLOWS):
+        if name.endswith(".yml"):
+            with open(os.path.join(WORKFLOWS, name), encoding="utf-8") as f:
+                out[name] = f.read()
+    return out
+
+
+class EveryImport(unittest.TestCase):
+    """#52: a change to a module runs every check that imports it, directly or through other repo
+    modules, locally (GROUPS) and in CI (the workflows' paths:), as #46 and #52 found by hand."""
+
+    def test_every_import_is_a_trigger(self):
+        self.assertEqual(import_gaps(checks_for.GROUPS, REPO, read_workflows()), [])
+
+    @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
+    def test_the_lists_hold_only_what_is_there(self):
+        # each LEFT_OUT entry is still imported and still missing from its groups' triggers
+        gaps = import_gaps(checks_for.GROUPS, left_out={})
+        self.assertEqual(len(gaps), len(LEFT_OUT), gaps)
+        for script, module in LEFT_OUT:
+            self.assertTrue(any(g.startswith("%s imports %s: no group" % (script, module)) for g in gaps), (script, module))
+        # each UNTOLD load is still in a file some check imports, and still one the guard cannot tell
+        untold = []
+        for g in checks_for.GROUPS:
+            for c in g[3]:
+                if c[0] == "py" and checks_for.present(c, REPO):
+                    imported(c[1], REPO, untold)
+        self.assertEqual(sorted(set(untold)), sorted(UNTOLD))
+
+    @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
+    def test_a_planted_gap_fails(self):
+        # #52 itself: the coord group without tools/logfiles.py, which test_coord.py imports
+        def without(group, path):
+            return (group[0], group[1], [t for t in group[2] if t != path], group[3])
+        groups = [without(g, "tools/logfiles.py") if g[0] == "coord" else g for g in checks_for.GROUPS]
+        self.assertEqual(import_gaps(groups), ["maintainer/tests/test_coord.py imports tools/logfiles.py: no group "
+                                               "that runs it (coord) has it in tools/checks_for.py GROUPS"])
+        flows = read_workflows()
+        flows["coord-tests.yml"] = flows["coord-tests.yml"].replace('      - "tools/logfiles.py"\n', "")
+        self.assertIn("maintainer/tests/test_prepush.py imports tools/logfiles.py: the paths: of coord-tests.yml lack it",
+                      import_gaps(checks_for.GROUPS, REPO, flows))
+
+    def test_a_group_that_runs_it_is_enough(self):
+        # test_check.py runs in three groups (config, machine check, speech): the config group alone
+        # lacks tools/upgrade.py, which it imports, and the three together cover all it imports
+        groups = [g for g in checks_for.GROUPS if g[0] in ("config", "machine check", "speech")]
+        self.assertIn("tools/tests/test_check.py imports tools/upgrade.py: no group that runs it (config) has it "
+                      "in tools/checks_for.py GROUPS", import_gaps(groups[:1]))
+        self.assertFalse([p for p in import_gaps(groups) if p.startswith("tools/tests/test_check.py ")])
+
+    def test_an_untold_load_fails(self):
+        load = ("tools/tests/test_upgrade.py", 'os.path.join(REPO, "docs", "upgrades", name)')
+        untold = []
+        self.assertIn("docs/upgrades/upgrade-0.4.0.py", imported("tools/tests/test_upgrade.py"))
+        self.assertNotIn("docs/upgrades/upgrade-0.4.0.py", imported("tools/tests/test_upgrade.py", REPO, untold, {}))
+        self.assertIn(load, untold)
+        group = [g for g in checks_for.GROUPS if g[0] == "upgrade"]
+        self.assertEqual(import_gaps(group), [])
+        self.assertEqual(import_gaps(group, told={}), [
+            "tools/tests/test_upgrade.py loads a module from tools/tests/test_upgrade.py's "
+            "os.path.join(REPO, \"docs\", \"upgrades\", name), which the guard cannot tell: make it a constant or "
+            "os.path.join of the file's constants, or list it in UNTOLD with what it loads"])
+
+
+class ReadsEveryImport(unittest.TestCase):
+    """loaded() on a scratch repo: each way a file loads a repo module, and what it leaves out."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def write(self, rel, text=""):
+        path = os.path.join(self.root, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_each_way(self):
+        for name in ("plain", "dotted", "fromed", "nested", "bypath", "helper", "dunder", "bymodule", "near"):
+            self.write("tools/%s.py" % name)
+        self.write("maintainer/tool.py")
+        self.write("tools/tests/test_x.py", "\n".join([
+            "import os, sys, json, importlib, importlib.util",
+            "import plain, dotted.sub",
+            "from fromed import thing",
+            "from collections import Counter",
+            "HERE = os.path.dirname(os.path.abspath(__file__))",
+            "TOOL = os.path.join(HERE, '..', 'bypath.py')",
+            "spec = importlib.util.spec_from_file_location('anything', TOOL)",
+            "spec = importlib.util.spec_from_file_location('m', os.path.join(HERE, '..', '..', 'maintainer', 'tool.py'))",
+            "def load(name):",
+            "    return importlib.util.spec_from_file_location(name, os.path.join(HERE, '..', name + '.py'))",
+            "def module(name):",
+            "    return __import__(name)",
+            "helper = load('helper')",
+            "dunder = module('dunder')",
+            "importlib.import_module('bymodule')",
+            "def later():",
+            "    import nested",
+            "import near",   # tools/tests/near.py first, beside the file
+            "spec = importlib.util.spec_from_file_location('gone', os.path.join(HERE, 'nothing.py'))",
+            "spec = importlib.util.spec_from_file_location('unknown', os.path.join(HERE, somewhere()))",
+            "def log_tool(root, name):",   # a Log's own tool, under a root it cannot tell: this repo's
+            "    return importlib.util.spec_from_file_location(name, os.path.join(root, 'tools', name + '.py'))",
+            "log_tool(somewhere(), 'under')",
+            "spec = importlib.util.spec_from_file_location('m', os.path.abspath(os.path.join(somewhere(), 'tools', 'kept.py')))",
+            "spec = importlib.util.spec_from_file_location('m', os.path.join(somewhere(), 'helper2.py'))",   # no such file
+            "class T:",
+            "    def fetch(self, name):",
+            "        return importlib.util.spec_from_file_location(name, os.path.join(HERE, '..', name + '.py'))",
+            "    def test(self):",
+            "        self.fetch('method')",
+            ""]))
+        self.write("tools/tests/near.py")
+        self.write("tools/under.py")
+        self.write("tools/method.py")
+        self.write("tools/kept.py")
+        self.assertEqual(sorted(reads("tools/tests/test_x.py", self.root)[1]),
+                         [("tools/tests/test_x.py", "os.path.join(HERE, somewhere())"),
+                          ("tools/tests/test_x.py", "os.path.join(somewhere(), 'helper2.py')")])
+        # json, importlib, collections: not repo modules; nothing.py: no such file; somewhere(): not told
+        self.assertEqual(sorted(loaded("tools/tests/test_x.py", self.root)), [
+            "maintainer/tool.py", "tools/bymodule.py", "tools/bypath.py", "tools/dotted.py", "tools/dunder.py",
+            "tools/fromed.py", "tools/helper.py", "tools/kept.py", "tools/method.py", "tools/nested.py",
+            "tools/plain.py", "tools/tests/near.py", "tools/under.py"])
+
+    def test_a_load_it_cannot_tell_is_untold(self):
+        # each a module the guard would miss if it read only the values it can tell
+        for name in ("a", "b", "c"):
+            self.write("tools/%s.py" % name)
+        self.write("tools/tests/test_x.py", "\n".join([
+            "import importlib.util, os",
+            "HERE = os.path.dirname(os.path.abspath(__file__))",
+            "TOOL = os.path.join(HERE, '..', 'a.py')",
+            "def load(name):",
+            "    return importlib.util.spec_from_file_location(name, os.path.join(HERE, '..', name + '.py'))",
+            "load('a')",
+            "for x in ['b']:",
+            "    load(x)",                       # a call whose argument is not told
+            "def twice():",
+            "    p = os.path.join(HERE, '..', 'a.py')",
+            "    importlib.util.spec_from_file_location('m', p)",
+            "    p = os.path.join(HERE, '..', 'b.py')",
+            "    importlib.util.spec_from_file_location('m', p)",   # p is bound twice: neither is told
+            "def shadow():",
+            "    TOOL = os.path.join(HERE, '..', 'c.py')",
+            "    importlib.util.spec_from_file_location('m', TOOL)",   # the local TOOL, not the module's
+            "def hide(TOOL):",
+            "    importlib.util.spec_from_file_location('m', TOOL)",   # a parameter hides the constant
+            "def keyword(*, TOOL):",
+            "    importlib.util.spec_from_file_location('m', TOOL)",   # a keyword-only one too
+            "def other(name):",
+            "    return importlib.util.spec_from_file_location(name, os.path.join(HERE, '..', name + '.py'))",
+            "other('a')",
+            "list(map(other, ['b']))",   # passed on: a call whose arguments it cannot tell
+            "def caller():",
+            "    NAME = 'b'",
+            "    other(NAME)",   # the caller's own constant
+            "def moved():",
+            "    global TOOL",
+            "    TOOL = 'elsewhere.py'",
+            ""]))
+        modules, untold = reads("tools/tests/test_x.py", self.root)
+        # TOOL is no constant (moved() rebinds it), so shadow()'s is the only told one
+        self.assertEqual(sorted(modules), ["tools/a.py", "tools/b.py", "tools/c.py"])
+        self.assertEqual(sorted(untold), sorted([
+            ("tools/tests/test_x.py", "os.path.join(HERE, '..', name + '.py')"),
+            ("tools/tests/test_x.py", "os.path.join(HERE, '..', name + '.py')"),
+            ("tools/tests/test_x.py", "p"), ("tools/tests/test_x.py", "p"), ("tools/tests/test_x.py", "TOOL"),
+            ("tools/tests/test_x.py", "TOOL")]))
+
+    def test_a_folder_named_in_told_is_read(self):
+        self.write("tools/a.py")
+        self.write("docs/up/guide.py", "import a\n")
+        self.write("tools/tests/test_x.py", "import importlib.util, os\n"
+                   "def run(name):\n    importlib.util.spec_from_file_location('g', os.path.join('docs', 'up', name))\n")
+        load = ("tools/tests/test_x.py", "os.path.join('docs', 'up', name)")
+        untold = []
+        self.assertEqual(sorted(imported("tools/tests/test_x.py", self.root, untold, {load: ["docs/up/"]})),
+                         ["docs/up/", "docs/up/guide.py", "tools/a.py", "tools/tests/test_x.py"])
+        self.assertEqual(untold, [load])
+
+    def test_through_other_modules_and_from_maintainer(self):
+        # a maintainer tool puts tools/ on sys.path and imports a tool, which imports another
+        self.write("maintainer/tool.py", "import sys\nsys.path.insert(0, 'tools')\nimport a\n")
+        self.write("maintainer/tests/test_tool.py",
+                   "import importlib.util, os\nHERE = os.path.dirname(os.path.abspath(__file__))\n"
+                   "spec = importlib.util.spec_from_file_location('tool', os.path.join(HERE, '..', 'tool.py'))\n")
+        self.write("tools/a.py", "import b\n")
+        self.write("tools/b.py", "import os\n")
+        self.assertEqual(sorted(imported("maintainer/tests/test_tool.py", self.root)),
+                         ["maintainer/tests/test_tool.py", "maintainer/tool.py", "tools/a.py", "tools/b.py"])
+
+    def test_a_planted_gap_in_a_scratch_map(self):
+        self.write("tools/export-template.sh", 'ALLOW="tools"\n')
+        self.write("tools/a.py", "import b\n")
+        self.write("tools/b.py")
+        self.write("tools/tests/test_a.py",
+                   "import importlib.util, os\nHERE = os.path.dirname(os.path.abspath(__file__))\n"
+                   "spec = importlib.util.spec_from_file_location('a', os.path.join(HERE, '..', 'a.py'))\n")
+        group = ("a", "a-tests.yml", ["tools/a.py", "tools/tests/test_a.py"], [checks_for.py("tools/tests/test_a.py")])
+        flow = 'on:\n  pull_request:\n    paths:\n      - "tools/a.py"\n      - "tools/tests/test_a.py"\n'
+        self.assertEqual(import_gaps([group], self.root, {"a-tests.yml": flow}), [
+            "tools/tests/test_a.py imports tools/b.py: no group that runs it (a) has it in tools/checks_for.py GROUPS",
+            "tools/tests/test_a.py imports tools/b.py: the paths: of a-tests.yml lack it"])
+        fixed = (group[0], group[1], group[2] + ["tools/b.py"], group[3])
+        flow += '      - "tools/b.py"\n'
+        self.assertEqual(import_gaps([fixed], self.root, {"a-tests.yml": flow}), [])
+        # a folder trigger covers what is under it, in GROUPS and as dir/** in paths:
+        folder = (group[0], group[1], ["tools/"], group[3])
+        self.assertEqual(import_gaps([folder], self.root, {"a-tests.yml": flow.replace('"tools/a.py"', '"tools/**"')}), [])
 
 
 if __name__ == "__main__":

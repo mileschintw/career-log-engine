@@ -1,6 +1,7 @@
 # Runs the tests of the chat-export parser, of the test-run grader (tools/check_run.py, which imports
 # tools/fit.py), of the save check it shares a rule with (tools/check_save.py, which imports
-# tools/writing_lint.py, tools/resume.py, tools/sponsorship.py and, in one function, tools/dashboard.py,
+# tools/writing_lint.py, tools/resume.py, tools/sponsorship.py and, in one function, tools/dashboard.py
+# and through it tools/scan.py,
 # and whose tests read skills/career-log/writing.md) and of tools/resume.py (which
 # reads config.toml through tools/config.py and the example resume it checks): three groups of
 # tools/checks_for.py's map (chat export, check run/save, resume), one job, since their paths: are
@@ -47,6 +48,7 @@ on:
       - "skills/career-log/modes/scan.md"
       - "skills/career-log/examples/resume.tex"
       - "skills/career-log/assets/resume-blank.tex"
+      - "tools/scan.py"
       - ".github/workflows/parser-tests.yml"
 
 permissions:

@@ -15,6 +15,8 @@ on:
       - "docs/upgrades/**"
       - "tools/config.py"
       - "tools/logfiles.py"
+      - "tools/checks_for.py"
+      - "tools/entries.py"
       - ".github/workflows/upgrade-tests.yml"
 
 permissions:
