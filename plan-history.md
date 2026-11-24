@@ -36,3 +36,9 @@ PR #43（#20）CI 過後依第一輪 merge right merge；push run 在 acfcdcc5 �
 
 | e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | PR #43 open, waitchecks | — |
 
+## 第一輪 merge：e32（2026-11-23 16:00 -0800）
+
+PR #44（#32、#36）CI 過後依第一輪 merge right merge。確認 blank issue 已關：開 `/issues/new/choose` 只看到兩個表單。Now 列：
+
+| e32 | pr | #32 #36 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | PR #44 open, waitchecks | — |
+
