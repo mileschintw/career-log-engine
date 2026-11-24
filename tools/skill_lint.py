@@ -36,6 +36,10 @@ tools/upgrade.py's DEV_URL or URL, in .github/, docs/, maintainer/, skills/, too
 tools/tests/ and maintainer/tests/ left out. A literal `<owner>` passes as the owner; a host in
 MIRRORS (a site showing the GitHub repo at the same path) has only its owner checked, and a MIRRORS
 host no address uses fails; with no host, an owner right after a slash is a local path's folder.
+In a Template or a Log (a root without `maintainer/`), a missing file the export leaves out (a path
+under tools/checks_for.py's SOURCE_ENGINE, such as docs/maintaining.md, in a folder the skeleton in
+tools/template/ does not have) is not a problem: it is in the Template's source alone, where the
+lint checks it.
 <root> defaults to the repo this script is in. Standard library only, Python 3.11+.
 
 There is no list of problems to ignore: a new check that finds breaks fixes them in the same pull
@@ -164,6 +168,8 @@ class Linter:
         self.skill = os.path.join(self.root, *SKILL.split("/"))
         self.docs = {}
         self.problems = []
+        # The source-only paths, in a root that is not the Template's source (no maintainer/)
+        self.left_out = () if os.path.isdir(os.path.join(self.root, "maintainer")) else source_engine()
 
     def doc(self, path):
         if path not in self.docs:
@@ -204,12 +210,23 @@ class Linter:
                 return p
         return None
 
+    def exported(self, p):
+        """False for a path the export leaves out, in a Template or a Log; True otherwise. A path of
+        SOURCE_ENGINE whose folder the skeleton (tools/template/) has, such as LICENSE or
+        .github/ISSUE_TEMPLATE/, ships from there."""
+        rel = os.path.relpath(p, self.root).replace(os.sep, "/")
+        if not any(rel.startswith(t) if t.endswith("/") else rel == t for t in self.left_out):
+            return True
+        return os.path.isdir(os.path.join(self.root, "tools", "template", *rel.split("/")[:-1]))
+
     def target(self, here, path, lineno, m):
         if m.group("href"):
             return self.resolve_href(here, m.group("href"), path)
-        p = self.resolve_name(here, m.group("name"))
-        if p is None:
-            self.add(path, lineno, "%s: no such file" % m.group("name"))
+        name = m.group("name")
+        p = self.resolve_name(here, name)
+        if p is None and all(self.exported(os.path.normpath(os.path.join(start, *name.split("/"))))
+                             for start in (os.path.dirname(here), self.root)):
+            self.add(path, lineno, "%s: no such file" % name)
         return p
 
     def check_file(self, path, at=None):
@@ -231,7 +248,8 @@ class Linter:
                     if p is None:
                         continue
                     if not os.path.exists(p):
-                        self.add(path, lineno, "link %s: no such file" % href)
+                        if self.exported(p):
+                            self.add(path, lineno, "link %s: no such file" % href)
                         continue
                     if "#" in href and p.endswith(".md"):
                         anchor = href.split("#", 1)[1]
@@ -527,6 +545,16 @@ class Linter:
         if browser != linking:
             self.add(check_py, line, "NEEDS's modes with playwright-cli differ from the modes whose files link browser.md:"
                      " %s only in NEEDS, %s only linking" % (sorted(browser - linking) or "none", sorted(linking - browser) or "none"))
+
+
+def source_engine():
+    """tools/checks_for.py's SOURCE_ENGINE beside this script: the paths only the Template's source
+    holds, which the export leaves out. Read, not imported: checks_for.py imports logfiles.py."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checks_for.py")
+    for node in ast.parse(read(path)).body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "SOURCE_ENGINE":
+            return tuple(ast.literal_eval(node.value))
+    raise SystemExit("skill_lint.py: no SOURCE_ENGINE in %s" % path)
 
 
 def guide_module():

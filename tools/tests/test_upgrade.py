@@ -12,6 +12,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 REPO = os.path.dirname(TOOLS)
 TOOL = os.path.join(TOOLS, "upgrade.py")
+# The Template's source, the one root with maintainer/, alone has upgrade-skeleton.*, and upgrade-next.*
+# but in a Dev build: a Template or a Log skips the tests that read them (#33). A Template exported to
+# a folder is no git repo yet: it skips the tests that read this repo's commits.
+SOURCE = os.path.isdir(os.path.join(REPO, "maintainer"))
+NOT_SOURCE = "not the Template's source: no maintainer/"
+GIT = os.path.exists(os.path.join(REPO, ".git"))
+NOT_GIT = "not a git repo (a Template exported to a folder)"
 
 spec = importlib.util.spec_from_file_location("upgrade", TOOL)
 upgrade = importlib.util.module_from_spec(spec)
@@ -671,6 +678,7 @@ class Upgrade(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("sh"), "no sh on PATH")
+@unittest.skipUnless(GIT, NOT_GIT)
 class Export(unittest.TestCase):
     """tools/export-template.sh's --version checks, in a clone of this repo's HEAD."""
 
@@ -703,7 +711,7 @@ class Export(unittest.TestCase):
         self.assertEqual(out.splitlines()[-1], "OK")
         self.assertNotIn("coverage ran", out)
 
-    @unittest.skipUnless(os.path.isdir(os.path.join(REPO, "maintainer")), "not the Template's source")
+    @unittest.skipUnless(SOURCE, NOT_SOURCE)
     def test_source_scans_the_starter_list(self):
         # the Engine repo has no .export-deny of its own: it scans with the list every Log starts with,
         # which has no pattern, and stamps the version
@@ -739,6 +747,7 @@ class Export(unittest.TestCase):
         with open(os.path.join(up, "upgrade-next.md"), "rb") as f:
             return f.read()
 
+    @unittest.skipUnless(SOURCE, NOT_SOURCE)
     def test_dev_build_ships_the_next_guide_as_it_stands(self):
         # a Dev build is no release: a guide holding a change does not stop it, and it ships the guide
         guide = self.next_guide(change=True)
@@ -753,6 +762,7 @@ class Export(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("holds a Log format change or a new setting", out)
 
+    @unittest.skipUnless(SOURCE, NOT_SOURCE)
     def test_release_ships_no_next_guide(self):
         self.next_guide(change=False)
         rc, out = self.export("--version", "0.4.1")
@@ -760,6 +770,7 @@ class Export(unittest.TestCase):
         names = os.listdir(os.path.join(self.tmp, "out", "docs", "upgrades"))
         self.assertEqual([n for n in names if "next" in n or "skeleton" in n or n.startswith("test-")], [])
 
+    @unittest.skipUnless(SOURCE, NOT_SOURCE)
     def test_refuses_while_next_guide_holds_a_change(self):
         up = os.path.join(self.src, "docs", "upgrades")
         for ext in ("md", "py"):   # from an empty guide, whatever changes upgrade-next.* holds now
@@ -848,6 +859,7 @@ def migrated_log(tmp):
     return log
 
 
+@unittest.skipUnless(os.path.isfile(NEXT_SCRIPT), "no upgrade-next.py: the source's, which only a Dev build ships")
 class NextGuide(unittest.TestCase):
     """Guide cases: the pending guide, docs/upgrades/upgrade-next.*, can be run again on a Log it
     already migrated (ADR 0015: a Log that follows dev builds runs it on each of them)."""
@@ -858,6 +870,7 @@ class NextGuide(unittest.TestCase):
     def tearDown(self):
         rmtree(self.tmp)
 
+    @unittest.skipUnless(GIT, NOT_GIT)
     def test_next_guide_runs_again_on_a_migrated_log(self):
         log = migrated_log(self.tmp)
         self.assertEqual(run_again(log), [])
@@ -886,14 +899,16 @@ class NextGuide(unittest.TestCase):
 
 
 class Source(unittest.TestCase):
-    """The tool against this repo's own export (skipped in a Template, which has the same files)."""
+    """The tool and the guides against this repo's own files; the source's own skipped in a Template."""
 
+    @unittest.skipUnless(GIT, NOT_GIT)
     def test_engine_paths_read_this_export(self):
         paths = upgrade.engine_paths(REPO, "HEAD")
         self.assertIn("skills", paths)
         self.assertIn("docs/upgrades", paths)
         self.assertIn(".github", paths)
 
+    @unittest.skipUnless(SOURCE, NOT_SOURCE)
     def test_skeleton_is_empty(self):
         # the empty form a release copies to upgrade-next.*: what the export's check reads as no change
         for name, sentinel in (("upgrade-skeleton.md", "No Log format change yet."), ("upgrade-skeleton.md", "This release adds none."),
@@ -901,6 +916,7 @@ class Source(unittest.TestCase):
             with open(os.path.join(REPO, "docs", "upgrades", name), encoding="utf-8") as f:
                 self.assertIn(sentinel, f.read().splitlines())
 
+    @unittest.skipUnless(SOURCE, NOT_SOURCE)
     def test_empty_next_guide_is_the_skeleton(self):
         # while upgrade-next.* holds no change, it is upgrade-skeleton.* as it is
         up = os.path.join(REPO, "docs", "upgrades")

@@ -828,7 +828,9 @@ class TableHelpers(unittest.TestCase):
         self.assertEqual(sorted({n for n, _, _ in found}), [1, 2, 3, 4, 5, 6, 7])
 
     def test_no_tool_reads_or_writes_a_table_by_hand(self):
-        paths = sorted(rel for folder in ("tools", "maintainer", "skills/career-log")
+        # maintainer/ is in the Template's source alone: a Template or a Log has none (#33)
+        folders = [f for f in ("tools", "maintainer", "skills/career-log") if os.path.isdir(os.path.join(REPO, f))]
+        paths = sorted(rel for folder in folders
                        for rel in (folder + "/" + name for name in os.listdir(os.path.join(REPO, *folder.split("/"))))
                        if rel.endswith(".py"))
         fails, listed = [], {rel: list(lines) for rel, lines in TABLE_BY_HAND.items()}
