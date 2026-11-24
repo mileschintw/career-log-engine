@@ -149,7 +149,8 @@ def dotted(node):
 
 
 # A path joined under a folder value() cannot tell (a Log's root, a test's scratch copy of one), as
-# value() gives it: reads() takes it as under this repo's root, whose tools/ a Log's are
+# value() gives it: reads() takes it as under this repo's root, whose tools/ a Log's are, when a
+# file is there, and as untold when none is (under_root())
 UNDER = "\0root/"
 
 
@@ -173,11 +174,21 @@ def value(node, env, path):
             return None
         if fn == "os.path.join":
             return os.path.join(*args)
-        if fn == "os.path.dirname" and len(args) == 1:
-            return os.path.dirname(args[0])
-        if fn in ("os.path.abspath", "os.path.normpath", "os.path.realpath") and len(args) == 1:
-            return os.path.normpath(args[0])
+        if len(args) == 1 and fn in ("os.path.dirname", "os.path.abspath", "os.path.normpath", "os.path.realpath"):
+            under, rest = (UNDER, args[0][len(UNDER):]) if args[0].startswith(UNDER) else ("", args[0])
+            return under + (os.path.dirname(rest) if fn == "os.path.dirname" else os.path.normpath(rest))
     return None
+
+
+def under_root(p, root):
+    """A path value() gave, with an UNDER path as the file under root it names; None (untold) when
+    that file is not there or UNDER is anywhere but at the start."""
+    if p is None or "\0" not in p:
+        return p
+    if not p.startswith(UNDER):
+        return None
+    p = os.path.normpath(os.path.join(root, p[len(UNDER):]))
+    return p if os.path.isfile(p) else None
 
 
 def loaded(rel, root=REPO):
@@ -287,13 +298,13 @@ def reads(rel, root=REPO):
                 else:
                     continue
                 got = [value(arg, e, path) for e in envs]
+                if into is paths:
+                    got = [under_root(g, root) for g in got]
                 into.update(g for g in got if g is not None)
                 if None in got:
                     untold.append((rel, ast.get_source_segment(source, arg)))
     out = set()
     for p in paths:
-        if p.startswith(UNDER):
-            p = os.path.join(root, p[len(UNDER):])
         p = os.path.relpath(os.path.normpath(os.path.join(os.path.dirname(path), p)), root).replace("\\", "/")
         if p.endswith(".py") and not p.startswith("../") and os.path.isfile(os.path.join(root, p)):
             out.add(p)
@@ -915,6 +926,8 @@ class ReadsEveryImport(unittest.TestCase):
             "def log_tool(root, name):",   # a Log's own tool, under a root it cannot tell: this repo's
             "    return importlib.util.spec_from_file_location(name, os.path.join(root, 'tools', name + '.py'))",
             "log_tool(somewhere(), 'under')",
+            "spec = importlib.util.spec_from_file_location('m', os.path.abspath(os.path.join(somewhere(), 'tools', 'kept.py')))",
+            "spec = importlib.util.spec_from_file_location('m', os.path.join(somewhere(), 'helper2.py'))",   # no such file
             "class T:",
             "    def fetch(self, name):",
             "        return importlib.util.spec_from_file_location(name, os.path.join(HERE, '..', name + '.py'))",
@@ -924,13 +937,15 @@ class ReadsEveryImport(unittest.TestCase):
         self.write("tools/tests/near.py")
         self.write("tools/under.py")
         self.write("tools/method.py")
-        self.assertEqual(reads("tools/tests/test_x.py", self.root)[1],
-                         [("tools/tests/test_x.py", "os.path.join(HERE, somewhere())")])
+        self.write("tools/kept.py")
+        self.assertEqual(sorted(reads("tools/tests/test_x.py", self.root)[1]),
+                         [("tools/tests/test_x.py", "os.path.join(HERE, somewhere())"),
+                          ("tools/tests/test_x.py", "os.path.join(somewhere(), 'helper2.py')")])
         # json, importlib, collections: not repo modules; nothing.py: no such file; somewhere(): not told
         self.assertEqual(sorted(loaded("tools/tests/test_x.py", self.root)), [
             "maintainer/tool.py", "tools/bymodule.py", "tools/bypath.py", "tools/dotted.py", "tools/dunder.py",
-            "tools/fromed.py", "tools/helper.py", "tools/method.py", "tools/nested.py", "tools/plain.py",
-            "tools/tests/near.py", "tools/under.py"])
+            "tools/fromed.py", "tools/helper.py", "tools/kept.py", "tools/method.py", "tools/nested.py",
+            "tools/plain.py", "tools/tests/near.py", "tools/under.py"])
 
     def test_a_load_it_cannot_tell_is_untold(self):
         # each a module the guard would miss if it read only the values it can tell
