@@ -221,6 +221,25 @@ class Typical(unittest.TestCase):
         self.assertIn("maintainer/tests/test_closing_refs.py", got)
         self.assertNotIn("maintainer/tests/test_coord.py", got)
 
+    @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
+    def test_every_maintainer_tool_runs_both_guards(self):
+        # #46: OneExportRunner (test_coord.py) and OneVersionForm (test_devbuild.py) read every
+        # maintainer/*.py, so a change to any of them, a new one too, runs both
+        names = sorted(n for n in os.listdir(os.path.join(REPO, "maintainer")) if n.endswith(".py"))
+        for name in names + ["new_tool.py"]:
+            got = scripts(runs(["maintainer/" + name]))
+            self.assertIn("maintainer/tests/test_coord.py", got, name)
+            self.assertIn("maintainer/tests/test_devbuild.py", got, name)
+        # a file in a folder below is no maintainer tool: the hook runs test_prepush.py alone
+        self.assertEqual(scripts(runs(["maintainer/hooks/pre-push"])), ["maintainer/tests/test_prepush.py"])
+
+    def test_glob_trigger(self):
+        # a trigger's * matches as in a workflow's paths:, within one folder
+        self.assertTrue(checks_for.matches("maintainer/x.py", "maintainer/*.py"))
+        self.assertFalse(checks_for.matches("maintainer/tests/x.py", "maintainer/*.py"))
+        self.assertFalse(checks_for.matches("maintainer/x.pyc", "maintainer/*.py"))
+        self.assertFalse(checks_for.matches("maintainerXx.py", "maintainer/*.py"))
+
     def test_resume(self):
         got = runs(["tools/resume.py"])
         self.assertIn("tools/tests/test_resume.py", scripts(got))

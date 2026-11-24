@@ -30,8 +30,9 @@ failure's last 40 lines. Then a `ran <n> checks` line with the wall time, and th
 and the `do:` lines, for you to run. When a check it ran failed, run that one alone before you fix
 anything, since checks side by side may clash (a file lock on Windows).
 
-The map is GROUPS below: each group's triggers (an exact path, or a folder ending in `/` for
-everything under it) and the checks it runs. A group with a workflow is what that workflow in
+The map is GROUPS below: each group's triggers (an exact path, a folder ending in `/` for
+everything under it, or a path with `*` for any characters but `/`, as a workflow's `paths:` reads
+it) and the checks it runs. A group with a workflow is what that workflow in
 this repo's .github/workflows/ runs, on the same `paths:`, the workflow's own file included; groups
 that share a workflow are run together by it, on all their `paths:`. tools/tests/test_checks_for.py
 fails when a workflow and its groups disagree. A new tool or test: add its group here, and in the
@@ -220,17 +221,16 @@ GROUPS = [
         do("run %s, then upgrade the scratch Log it builds with docs/upgrades/upgrade-next.md through the "
            "upgrade mode; its header says how (docs/maintaining.md › Log format changes)" % NEXT_TEST, NEXT_TEST),
     ]),
+    # The guards of test_coord.py (OneExportRunner) and test_devbuild.py (OneVersionForm) read every
+    # maintainer/*.py, so both groups take them all, a new one too (#46)
     ("coord", "coord-tests.yml", [
-        "maintainer/coord.py", "maintainer/tests/test_coord.py", "tools/export-template.sh", "tools/deny_coverage.py",
+        "maintainer/*.py", "maintainer/tests/test_coord.py", "tools/export-template.sh", "tools/deny_coverage.py",
         "tools/upgrade.py",
-        # its OneExportRunner reads every maintainer/*.py: a new one goes here too
-        "maintainer/devbuild.py", "maintainer/harness.py", "maintainer/prepush.py",
     ], [
         py("maintainer/tests/test_coord.py"),
     ]),
     ("dev build", "coord-tests.yml", [
-        "maintainer/devbuild.py", "maintainer/tests/test_devbuild.py", "maintainer/coord.py", "tools/export-template.sh",
-        "tools/upgrade.py",
+        "maintainer/*.py", "maintainer/tests/test_devbuild.py", "tools/export-template.sh", "tools/upgrade.py",
     ], [
         py("maintainer/tests/test_devbuild.py"),
     ]),
@@ -314,7 +314,11 @@ def triggers(group, root):
 
 
 def matches(path, trigger):
-    return path.startswith(trigger) if trigger.endswith("/") else path == trigger
+    if trigger.endswith("/"):
+        return path.startswith(trigger)
+    if "*" in trigger:   # as paths: reads it: * stays within one folder
+        return re.fullmatch("[^/]*".join(map(re.escape, trigger.split("*"))), path) is not None
+    return path == trigger
 
 
 def kind(path, root):
