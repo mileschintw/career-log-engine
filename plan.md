@@ -30,7 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e24 | pr | #24 | local_fb3ec7ec-9018-4991-91b5-6622fdb72507（落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e24-48edc9`） | started | — |
+| e24 | pr | #24 | local_fb3ec7ec-9018-4991-91b5-6622fdb72507（落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e24-48edc9`） | PR #53 open, waitchecks | — |
 
 **Main checkout:** none.
 
