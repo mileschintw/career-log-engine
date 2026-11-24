@@ -95,3 +95,10 @@ PR #54 merged，關閉 #17、#49；master push run 在 46ed16aa 通過（Dev bui
 | e17 | pr | #17 #49 | local_f44ecadd-26c9-4624-9d40-d9039241d4b2（落在 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e17-18146b`） | PR #54 open, waitchecks | — |
 | #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 1`（item 4） | 第三輪 lane e17 |
 | #49 升級模式：Sonnet 在 step 5 摘要重複 Dev build 警告 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 5` | 第三輪 lane e17 |
+
+## e29 merged（2026-11-24 07:18Z）
+
+PR #55 merged，關閉 #29；master push run 在 662a9ea5 通過（Dev build）。`harness.py copy` 留著但拒絕 Log 資料；讀 Log 的 case 用 template-copy＋每個 case 自己的 fixture。報告 `reports/e29.md`。Now 列：
+
+| e29 | pr | #29 | local_d6d20f13-f7af-44ba-9fd5-33f16f3e68a0（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e29-8c9454`） | PR #55 open, waitchecks | — |
+| #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | 1 | none | none | `maintainer/harness.py › copy`、`docs/maintaining-tests.md › Harness` | 第三輪 lane e29 |
