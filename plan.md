@@ -30,7 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e52 | pr | #52 | local_524d3b89-26bb-4cc4-bfe1-b067c354ad7a（落在 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e52-366592`） | blocked：第 4 輪 review 仍有 blocker（`os.path.join(<untold>, …)` 被當成 repo 內路徑，對不到檔就默默略過）；worker 問 fix＋第 5 輪 或 revert 回 457f2c2，等使用者 | — |
+| e52 | pr | #52 | local_524d3b89-26bb-4cc4-bfe1-b067c354ad7a（落在 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e52-366592`） | review：使用者 picked「Fix，跑第 5 輪」，worker 修正後跑第 5 輪；再有 blocker 就回來問 | — |
 
 **Main checkout:** none.
 
@@ -50,7 +50,6 @@ none
 
 ## Waiting for the user's decision
 
-- **e52 第 4 輪 review 仍有 blocker（since 2026-11-24 00:30 -0800）：** fix（約 10 行，對不到 repo 檔的 untold join 算 untold）再跑第 5 輪，或 revert 回 457f2c2 的讀法。建議 fix。
 - **第三輪結束後：** #28（四個選項選哪些，建議先 1、3）；Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
 
 ## Deadlines

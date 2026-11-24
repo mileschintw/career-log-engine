@@ -102,3 +102,5 @@ PR #55 merged，關閉 #29；master push run 在 662a9ea5 通過（Dev build）�
 
 | e29 | pr | #29 | local_d6d20f13-f7af-44ba-9fd5-33f16f3e68a0（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e29-8c9454`） | PR #55 open, waitchecks | — |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | 1 | none | none | `maintainer/harness.py › copy`、`docs/maintaining-tests.md › Harness` | 第三輪 lane e29 |
+
+- **e52 第 4 輪 review 仍有 blocker（since 2026-11-24 00:30 -0800）：** fix（約 10 行，對不到 repo 檔的 untold join 算 untold）再跑第 5 輪，或 revert 回 457f2c2 的讀法。建議 fix。 → 使用者 picked「Fix，跑第 5 輪」。
