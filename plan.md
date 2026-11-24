@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23 16:49 -0800）：** 第一輪九條 lane 全部 merge（#38–#45、#47）。沒有 lane、沒有鬧鐘。等使用者：下一輪排什麼（#37、#46、#24 等）、要不要寫 Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
+- **Next（2026-11-23）：** 第二輪 e46、e37、e24 在跑（merge right 見下）。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -30,6 +30,9 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
+| e46 | pr | #46 | local_f0e93011-09b8-4f6c-a556-9e3bb87b05f6（落在已 archive 的 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e46-0d3d17`） | started | — |
+| e37 | pr | #37 #48 | local_ce3c81e2-c1be-48fb-b734-b260e75431a1（落在已 archive 的 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e37-be3720`） | started | — |
+| e24 | pr | #24 | local_fb3ec7ec-9018-4991-91b5-6622fdb72507（落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e24-48edc9`） | started | — |
 
 **Main checkout:** none.
 
