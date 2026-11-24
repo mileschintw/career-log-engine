@@ -535,6 +535,7 @@ class CopyBase(unittest.TestCase):
     def setUp(self):
         self.copy = tempfile.mkdtemp()
         self.git("init", "-q")
+        check_run.logfiles.no_maintenance(self.copy)   # a commit starts git's maintenance too: none left running at tearDown
         self.write(".gitignore", ".build/\n")
         self.write("entries/2026-01-queue.md", ENTRY)
         self.write("outputs/resumes/backend.tex", TEX)
@@ -580,8 +581,7 @@ class CopyBase(unittest.TestCase):
         if not os.path.isdir(remote):
             subprocess.run(["git", "init", "-q", "--bare", "-b", branch, remote], check=True, capture_output=True)
             self.addCleanup(shutil.rmtree, remote, True)
-            check_run.logfiles.no_maintenance(remote)   # it receives a push, and the copy fetches
-            check_run.logfiles.no_maintenance(self.copy)
+            check_run.logfiles.no_maintenance(remote)   # it receives a push
             self.git("remote", "add", "origin", remote)
         self.git("push", "-q", "-f", "origin", "HEAD:" + branch)
         self.git("fetch", "-q", "origin")
@@ -1448,6 +1448,7 @@ class OutsideRootAndPaths(unittest.TestCase):
 
     def test_relative_copy_is_made_absolute(self):
         subprocess.run(["git", "init", "-q", self.root], check=True)
+        check_run.logfiles.no_maintenance(self.root)   # a commit starts git's maintenance too: none left running at tearDown
         subprocess.run(["git", "-C", self.root, "-c", "user.email=t@example.invalid", "-c", "user.name=T",
                         "commit", "-q", "--allow-empty", "-m", "base"], check=True)
         path = os.path.join(self.tmp, "run.jsonl")

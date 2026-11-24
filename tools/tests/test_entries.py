@@ -3584,6 +3584,7 @@ class EntryChanges(unittest.TestCase):
         git = lambda *a: subprocess.run(["git", "-C", root, "-c", "user.name=t", "-c", "user.email=t@example.com"]
                                         + list(a), check=True, capture_output=True, encoding="utf-8").stdout
         git("init", "-q")
+        entries.logfiles.no_maintenance(root)   # a commit starts git's maintenance too: none left running at tearDown
         os.makedirs(os.path.join(root, "entries"))
         path = os.path.join(root, "entries", "2025-01-a.md")
         with open(path, "w", encoding="utf-8") as f:

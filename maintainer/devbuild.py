@@ -40,7 +40,9 @@ spec.loader.exec_module(coord)
 Fail, git = coord.Fail, coord.git
 # The forms of a release and a Dev build version, and their order, are tools/upgrade.py's (#22)
 upgrade = coord.upgrade
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "tools"))   # -I leaves it off sys.path
+TOOLS = os.path.join(os.path.dirname(HERE), "tools")
+if TOOLS not in sys.path:   # coord.py has put it there; -I leaves it off
+    sys.path.insert(0, TOOLS)
 import logfiles  # noqa: E402
 
 NO_CHANGE = "No Log format change yet."

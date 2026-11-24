@@ -78,6 +78,7 @@ class CheckSave(unittest.TestCase):
         shutil.copy(os.path.join(REPO, "skills", "career-log", "writing.md"),
                     os.path.join(self.root, "skills", "career-log", "writing.md"))
         self.git("init", "-q")
+        check_save.logfiles.no_maintenance(self.root)   # a commit starts git's maintenance too: none left running at tearDown
         self.git("add", "-A")
         self.git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "base")
 

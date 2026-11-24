@@ -147,6 +147,7 @@ class Publish(Temp):
         self.src = os.path.join(self.tmp, "src")
         git(self.tmp, "clone", "-q", REPO, self.src)
         identity(self.src)
+        logfiles.no_maintenance(self.src)   # a commit starts git's maintenance too: none left running at tearDown
         upgrades = os.path.join(self.src, "docs", "upgrades")
         for ext in ("md", "py"):
             shutil.copyfile(os.path.join(upgrades, "upgrade-skeleton." + ext), os.path.join(upgrades, "upgrade-next." + ext))
@@ -157,6 +158,7 @@ class Publish(Temp):
         logfiles.no_maintenance(self.tpl_remote)   # it receives a push: no gc left running at tearDown
         git(self.tmp, "clone", "-q", self.tpl_remote, seed)
         identity(seed)
+        logfiles.no_maintenance(seed)
         write(os.path.join(seed, "stale.md"), "from the last release\n")
         write(os.path.join(seed, "SETUP.md"), "old\n")
         git(seed, "add", "-A")

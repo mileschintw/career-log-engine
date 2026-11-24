@@ -1,9 +1,9 @@
 """The helpers the Log's tools share: reading and writing its files, front matter, Markdown tables
 and sections, heading anchors, slugs, dated names, git (and removing a folder git wrote in), the
-Log's root and its own files, the applications it records, the Target versions and the start record, a posting run's folder, a
-session's record (its key, baseline and claims: ADR 0014) and the uncommitted Log files each session
-claimed, the URLs in a text, an HTML page's text, a time in this machine's zone, and Claude Code's
-project folder for a checkout.
+Log's root and its own files, the applications it records, the Target versions and the start
+record, a posting run's folder, a session's record (its key, baseline and claims: ADR 0014) and the
+uncommitted Log files each session claimed, the URLs in a text, an HTML page's text, a time in this
+machine's zone, and Claude Code's project folder for a checkout.
 
 A library, with no command line. A tool beside it imports it with
   sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # -I leaves this folder off sys.path
@@ -712,9 +712,10 @@ def rmtree(path):
 
 
 def no_maintenance(repo):
-    """Turn git's automatic maintenance off in repo, a scratch repository that fetches or receives a
-    push: either starts `git maintenance run --auto`, whose gc detaches and can still be writing
-    there when rmtree removes the folder (#24). Not for a user's own repository: pass
+    """Turn git's automatic maintenance off in repo, a scratch repository a test or a tool removes
+    afterwards: a commit, a fetch or a push it receives starts `git maintenance run --auto`, which
+    detaches and can still be writing there (its maintenance.lock, a gc) when rmtree removes the
+    folder (#24). Call it right after `git init` or `git clone`. Not for a user's own repository: pass
     `-c maintenance.auto=false -c gc.auto=0` to the one command there instead."""
     for key, value in (("maintenance.auto", "false"), ("gc.auto", "0")):
         git(repo, "config", key, value)

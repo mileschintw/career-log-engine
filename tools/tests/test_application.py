@@ -3,7 +3,7 @@
 
   python3 -I tools/tests/test_application.py
 """
-import contextlib, datetime, email, email.message, email.policy, importlib.util, io, os, shutil, subprocess, sys, tempfile, unittest, zipfile
+import contextlib, datetime, email, email.message, email.policy, importlib.util, io, os, subprocess, sys, tempfile, unittest, zipfile
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -75,6 +75,7 @@ class Base(unittest.TestCase):
         self.root = os.path.join(self.tmp, "log")
         os.makedirs(self.root)
         self.git("init", "-q")
+        application.logfiles.no_maintenance(self.root)   # a commit starts git's maintenance too: none left running at tearDown
         self.write("README.md", "# Log\n")
         self.commit("base")
 

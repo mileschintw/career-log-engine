@@ -142,6 +142,7 @@ class Base(unittest.TestCase):
         self.wt = os.path.join(self.tmp, "wt")
         os.makedirs(self.wt)
         git(self.wt, "init", "-q", "-b", "feature")
+        logfiles.no_maintenance(self.wt)   # a commit starts git's maintenance too: none left running at tearDown
         git(self.wt, "config", "user.email", "test@example.com")
         git(self.wt, "config", "user.name", "Test")
         os.makedirs(os.path.join(self.wt, "tools"))

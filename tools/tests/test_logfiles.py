@@ -1110,8 +1110,8 @@ class OneRmtree(unittest.TestCase):
             fails += ["%s:%d: rmtree by hand: %s" % (rel, line, text) for line, text in found]
         self.assertEqual(fails, [], "\n" + "\n".join(fails) + "\nCall logfiles.rmtree(path) to remove a folder "
                          "git wrote in: it removes git's read-only files and takes a file already gone as "
-                         "removed. Turn automatic maintenance off in a scratch repository that fetches or "
-                         "receives a push with logfiles.no_maintenance(repo).")
+                         "removed. Turn automatic maintenance off in the scratch repository first, right "
+                         "after git init or clone, with logfiles.no_maintenance(repo).")
 
 
 if __name__ == "__main__":
