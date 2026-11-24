@@ -229,13 +229,6 @@ class TestCopy(Base):
         self.assertEqual(rc, 1)
         self.assertIn("not empty", err)
 
-    def test_says_the_copy_holds_no_log_data(self):
-        """#29: this repo holds no Log, so the copy is the Engine only, and says so."""
-        rc, out, _ = self.copy()
-        self.assertEqual(rc, 0, out)
-        self.assertIn("note: %s holds no Log data" % self.log, out)
-        self.assertIn("template-copy", out)
-
     def test_refuses_a_branch_that_holds_log_data(self):
         """#29: copy never takes a real record; a case that reads the Log takes template-copy and fixtures."""
         for path in ("profile.md", "entries/2026-01-01-x.md", "outputs/x.md"):
@@ -246,18 +239,19 @@ class TestCopy(Base):
                 rc, _, err = self.copy()
                 self.assertEqual(rc, 1)
                 self.assertIn(path, err)
-                self.assertIn("template-copy", err)
+                self.assertIn("Build one scratch copy", err)
                 self.assertFalse(os.path.exists(self.t))
                 git(self.wt, "rm", "-q", path)
                 git(self.wt, "commit", "-qm", "no data")
 
-    def test_takes_the_entry_template(self):
-        """entries/_template.md is the Engine's, not Log data."""
-        write(os.path.join(self.wt, "entries", "_template.md"), "x\n")
-        git(self.wt, "add", "entries/_template.md")
-        git(self.wt, "commit", "-qm", "template")
-        rc, out, _ = self.copy()
-        self.assertEqual(rc, 0, out)
+    def test_takes_the_engine_repos_own_files(self):
+        """entries/_template.md, the front pages and config.toml (Base commits one) are no Log data."""
+        for path in ("entries/_template.md", "README.md", "README.zh-TW.md"):
+            write(os.path.join(self.wt, path), "x\n")
+        git(self.wt, "add", "-A")
+        git(self.wt, "commit", "-qm", "engine files")
+        rc, out, err = self.copy()
+        self.assertEqual(rc, 0, out + err)
 
 
 class TestReset(Base):

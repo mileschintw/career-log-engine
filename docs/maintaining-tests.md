@@ -163,7 +163,7 @@ Done when: it printed no FAIL line, and a Template copy's `<t>/log` holds every 
 
 `harness.py template-copy <t>` makes a copy from the export of the committed branch: a new Log with no history. When the expected sheet lists fixtures or edits for the test case, add `--no-seed`, write them in `<t>/log`, then run `harness.py seed <t>`. Add `--no-config` only for a case that must start with no `config.toml` (*The real profile*'s exception); a setup *Changes* case for a Config or Direction field needs it.
 
-Done when: it printed no FAIL line. To reset it, run `harness.py remove <t>` and build it again.
+Done when: it printed no FAIL line, after `seed` when you gave `--no-seed`. To reset it, run `harness.py remove <t>` and build it again.
 
 ### Reset a copy before each run
 

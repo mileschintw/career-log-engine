@@ -45,9 +45,8 @@ copy           builds a copy of <b> as it is committed in <w> (an uncommitted ch
                <test@example.invalid>. It carries no Log data: this repo holds no Log, so the copy
                is the Engine and the maintainer's files, for a case that runs in this repo itself;
                a case that reads entries, profile or direction takes template-copy and fixtures.
-               A <b> that holds Log data (a Log file or folder of tools/logfiles.py's LOG_FILES and
-               LOG_FOLDERS but entries/_template.md, the front pages and config.toml) is refused,
-               by reset too. When update_check is not off, a commit `test: update_check off` on top
+               A <b> that holds Log data is refused; reset refuses it too. When update_check is not
+               off, a commit `test: update_check off` on top
                of the head under test turns it off and is pushed; it changes no Engine file. Then
                runs verify. <t> must be empty or missing.
 template-copy  builds a copy from `tools/export-template.sh` of <w>'s committed head: a new Log
@@ -361,19 +360,18 @@ def update_check_off(t, default):
 
 # ---- copy, template-copy, seed, reset, verify ----
 
-# The Log's own files (logfiles.LOG_FILES) that a copy of this repo refuses: not the front pages,
-# which an Engine repo may have too, nor config.toml, which copy writes itself.
-DATA_FILES = [p for p in logfiles.LOG_FILES if p not in ("README.md", "README.zh-TW.md", "config.toml")]
+# Log paths (logfiles.is_log_path) an Engine repo may hold too: its front pages, and the config.toml
+# copy itself writes.
+NOT_DATA = ("README.md", "README.zh-TW.md", "config.toml")
 
 
 def no_log_data(worktree, branch):
     """Refuse a <branch> that holds Log data (#29: this repo holds none, and a copy takes none)."""
     paths = out(worktree, "ls-tree", "-r", "--name-only", "--full-tree", branch).splitlines()
-    data = [p for p in paths if p not in logfiles.NOT_LOG
-            and (p in DATA_FILES or p.split("/", 1)[0] in logfiles.LOG_FOLDERS and "/" in p)]
+    data = [p for p in paths if logfiles.is_log_path(p) and p not in NOT_DATA]
     if data:
-        raise Fail("%s holds Log data (%s%s): copy takes the Engine only; a case that reads the Log "
-                   "builds it with template-copy and fixtures (docs/maintaining-tests.md › Harness)"
+        raise Fail("%s holds Log data (%s%s): copy takes the Engine only (docs/maintaining-tests.md › "
+                   "Build one scratch copy per concurrent run)"
                    % (branch, ", ".join(data[:5]), ", ..." if len(data) > 5 else ""))
 
 
@@ -397,8 +395,6 @@ def cmd_copy(a):
     save(t, {"kind": "copy", "worktree": worktree, "branch": branch, "default": default, "head": head,
              "no_config": False, "seeded": True})
     update_check_off(t, default)
-    print("note: %s holds no Log data (no entries, profile or direction): a case that reads them "
-          "takes template-copy and fixtures" % log)
     return cmd_verify(a)
 
 
