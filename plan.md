@@ -9,13 +9,13 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23）：** 接手時跑過 `ready`（沒有 lane），比對過 `gh issue list`（開著的 issue 和 Roadmap 一致）、`gh pr list`（沒有開著的 PR）、`git branch -r`（`claude/lane-*` 八條遠端分支都已併進 `master`）。沒有 lane、沒有鬧鐘。使用者確認了三件決定（見 `plan-history.md`），#31–#33 已開，13 個 lane session 已 archive，8 條分支已刪。第一輪已開工（merge right 見下）。輪外：#34／PR #35（`docs/agents/issue-tracker.md` 的 Files 節）2026-11-23 由 owner 在別的 session merge，master 到 67144da。九條都開了（e27、e31、e32、e22 由使用者按卡片開，分支名是 app 取的，見 Now 表）；e22 park 到 #33 merge。
+- **Next（2026-11-23 16:49 -0800）：** 第一輪九條 lane 全部 merge（#38–#45、#47）。沒有 lane、沒有鬧鐘。等使用者：下一輪排什麼（#37、#46、#24 等）、要不要 archive 第一輪的九個 session、要不要寫 Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** 2026-11-23 15:14 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第一輪的 9 條 lane 嗎？）：lanes e33、e15、e20、e21、e23、e27、e31、e32、e22。
+- **Merge right:** none（第一輪的已結束，在 `plan-history.md`〈第一輪結束〉）
 - **Unattended log:** none
 
 ## Rulings
@@ -30,7 +30,6 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | PR #47 open, waitchecks | — |
 
 **Main checkout:** none.
 
@@ -41,7 +40,6 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
 | #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；0.4.1 發出去後錯的 `stop:` 不會再出現，剩一個假設 |
-| #22 版本字串只定義一次 | 1 | none | none | `maintainer/devbuild.py`、`tools/tests/test_upgrade.py`、`maintainer/tests/test_devbuild.py` | 第一輪 lane e22，GO（#33 已 merge） |
 | #24 一個 rmtree helper | — | none | none | 多個測試檔和 maintainer 工具 | 不排 lane：優先度低 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
@@ -55,8 +53,7 @@ none
 
 ## Waiting for the user's decision
 
-- **#37（since 2026-11-23）：** e20 開的，Sonnet 沒等 yes 就走過 step 2；needs-triage，和 e27 同一節，建議 e27 merge 後再排。
-- **#46（since 2026-11-24）：** e22 開的，`maintainer/template_checks.py` 不在 coord 群組和 `coord-tests.yml` 的 paths，guard 不跑；needs-triage，建議 e22 merge 後下一輪排。
+- **第一輪結束後（since 2026-11-23 16:49 -0800）：** 下一輪（建議 #46、#37 triage 後、#24）；archive 第一輪九個 lane session；Log 升到最新 Dev build 的 prompt；e27 提的「step 1 的 Dev build 警告要不要刪」要不要開 issue。
 
 ## Deadlines
 

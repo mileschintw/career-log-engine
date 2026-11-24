@@ -48,3 +48,13 @@ PR #45（#33）CI 過後（新的 `template-checks` job 第一次跑也過）依
 
 | e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | PR #45 open, waitchecks | — |
 
+## 第一輪結束：e22（2026-11-23 16:49 -0800）
+
+PR #47（#22）CI 過後 merge。第一輪九條 lane 全部 merge。Merge right 結束，原文：
+
+- **Merge right:** 2026-11-23 15:14 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第一輪的 9 條 lane 嗎？）：lanes e33、e15、e20、e21、e23、e27、e31、e32、e22。
+
+Now 列：
+
+| e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | PR #47 open, waitchecks | — |
+
