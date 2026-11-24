@@ -47,6 +47,7 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
 | #37 升級模式：Sonnet 沒等使用者 yes 就走過 step 2 的計畫 | — | none | after #27, `skills/career-log/modes/upgrade.md › step 2` | `skills/career-log/modes/upgrade.md › step 2` | 不排 lane：needs-triage，e20 開的；等使用者 |
+| #46 `maintainer/*.py` 的 guard 不是每個 maintainer 工具都跑 | — | none | after #22, `maintainer/tests/test_devbuild.py › OneVersionForm`（如果搬） | `coord-tests.yml › paths:`、`tools/checks_for.py › GROUPS` 的 `coord`／`dev build` | 不排 lane：needs-triage，e22 開的；也涵蓋 e32 報告問的「每個 maintainer/*.py 都在 coord 群組的測試」；等使用者 |
 
 ## Waiting for the user to be present
 
@@ -55,6 +56,7 @@ none
 ## Waiting for the user's decision
 
 - **#37（since 2026-11-23）：** e20 開的，Sonnet 沒等 yes 就走過 step 2；needs-triage，和 e27 同一節，建議 e27 merge 後再排。
+- **#46（since 2026-11-24）：** e22 開的，`maintainer/template_checks.py` 不在 coord 群組和 `coord-tests.yml` 的 paths，guard 不跑；needs-triage，建議 e22 merge 後下一輪排。
 
 ## Deadlines
 
