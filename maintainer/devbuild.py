@@ -40,6 +40,10 @@ spec.loader.exec_module(coord)
 Fail, git = coord.Fail, coord.git
 # The forms of a release and a Dev build version, and their order, are tools/upgrade.py's (#22)
 upgrade = coord.upgrade
+TOOLS = os.path.join(os.path.dirname(HERE), "tools")
+if TOOLS not in sys.path:   # coord.py has put it there; -I leaves it off
+    sys.path.insert(0, TOOLS)
+import logfiles  # noqa: E402
 
 NO_CHANGE = "No Log format change yet."
 NEXT_GUIDE = "docs/upgrades/upgrade-next.md"
@@ -97,23 +101,6 @@ def bring_releases(dest, url, url_tags, dest_tags):
         git(dest, "-c", "maintenance.auto=false", "-c", "gc.auto=0", "fetch", "-q", "--no-tags", url,
             *("refs/tags/%s:refs/tags/%s" % (n, n) for n in want))
     return want
-
-
-def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows, and takes a file
-    already gone (removed by a git process still running there) as removed."""
-    def retry(func, p, exc):
-        if isinstance(exc, FileNotFoundError) or (isinstance(exc, tuple) and exc[0] is FileNotFoundError):
-            return
-        try:
-            os.chmod(p, 0o700)
-            func(p)
-        except FileNotFoundError:
-            pass
-    if sys.version_info >= (3, 12):
-        shutil.rmtree(path, onexc=retry)
-    else:
-        shutil.rmtree(path, onerror=retry)
 
 
 def stage_tree(root, source, out, stage):
@@ -184,7 +171,7 @@ def build(a):
         git(dest, "-c", "maintenance.auto=false", "-c", "gc.auto=0", "fetch", "-q", "--no-tags", stage,
             "refs/heads/export")
     finally:
-        rmtree(tmp)
+        logfiles.rmtree(tmp)
     # a build kept here is upgraded to from here alone; one pushed (CI's) is upgraded to from where it
     # is pushed, with the releases from the Template, so it needs none here
     brought = [] if a.push else bring_releases(dest, url, url_tags, dest_tags)

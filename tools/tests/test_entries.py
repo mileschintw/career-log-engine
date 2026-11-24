@@ -3580,10 +3580,11 @@ class EntryChanges(unittest.TestCase):
     """The per-entry git log application.py stale and story-stale share (#661)."""
     def test_changes_uncommitted_and_gone(self):
         root = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, root, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        self.addCleanup(entries.logfiles.rmtree, root)
         git = lambda *a: subprocess.run(["git", "-C", root, "-c", "user.name=t", "-c", "user.email=t@example.com"]
                                         + list(a), check=True, capture_output=True, encoding="utf-8").stdout
         git("init", "-q")
+        entries.logfiles.no_maintenance(root)   # a commit starts git's maintenance too: none left running at tearDown
         os.makedirs(os.path.join(root, "entries"))
         path = os.path.join(root, "entries", "2025-01-a.md")
         with open(path, "w", encoding="utf-8") as f:

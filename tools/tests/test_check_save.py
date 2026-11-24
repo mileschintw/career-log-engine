@@ -78,11 +78,12 @@ class CheckSave(unittest.TestCase):
         shutil.copy(os.path.join(REPO, "skills", "career-log", "writing.md"),
                     os.path.join(self.root, "skills", "career-log", "writing.md"))
         self.git("init", "-q")
+        check_save.logfiles.no_maintenance(self.root)   # a commit starts git's maintenance too: none left running at tearDown
         self.git("add", "-A")
         self.git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "base")
 
     def tearDown(self):
-        shutil.rmtree(self.tmp, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))   # git's read-only objects
+        check_save.logfiles.rmtree(self.tmp)
 
     def write(self, rel, body):
         path = os.path.join(self.root, *rel.split("/"))

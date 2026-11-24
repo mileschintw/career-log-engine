@@ -112,13 +112,6 @@ for line in sys.stdin:
 '''
 
 
-def rmtree(path):
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
-    shutil.rmtree(path, onerror=retry)
-
-
 def git(cwd, *args):
     return subprocess.run(["git", "-C", cwd, "-c", "core.autocrlf=false", *args], check=True,
                           capture_output=True, encoding="utf-8").stdout.strip()
@@ -145,10 +138,11 @@ def run(*argv):
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        self.addCleanup(rmtree, self.tmp)
+        self.addCleanup(logfiles.rmtree, self.tmp)
         self.wt = os.path.join(self.tmp, "wt")
         os.makedirs(self.wt)
         git(self.wt, "init", "-q", "-b", "feature")
+        logfiles.no_maintenance(self.wt)   # a commit starts git's maintenance too: none left running at tearDown
         git(self.wt, "config", "user.email", "test@example.com")
         git(self.wt, "config", "user.name", "Test")
         os.makedirs(os.path.join(self.wt, "tools"))
@@ -384,7 +378,7 @@ class TestTemplateFrom(Base):
         self.assertEqual(modes["tools/setup.sh"], "100755")
         self.assertEqual(modes["README.md"], "100644")
         self.assertEqual(modes["tools/added.sh"], "100644")
-        rmtree(self.t)
+        logfiles.rmtree(self.t)
         with mock.patch.dict(os.environ, env):
             rc, out, err = run(*argv)   # without it, as before
         self.assertEqual(rc, 0, out + err)
@@ -397,12 +391,12 @@ class TestTemplateFrom(Base):
                          "--modes-from", clone, "v1")
         self.assertEqual(rc, 1)
         self.assertIn("does not hold the files of --from (extra.md)", err)
-        rmtree(self.t)
+        logfiles.rmtree(self.t)
         rc, _, err = run("template-copy", self.t, "--worktree", self.wt, "--default", "master",
                          "--from", tree, "--modes-from", clone, "v9")
         self.assertEqual(rc, 1)
         self.assertIn("--modes-from: no v9 in", err)
-        rmtree(self.t)
+        logfiles.rmtree(self.t)
         rc, _, err = run("template-copy", self.t, "--worktree", self.wt, "--default", "master",
                          "--modes-from", clone, "v1")
         self.assertEqual(rc, 1)
@@ -638,7 +632,7 @@ class TestProcess(Base):
     def test_a_missing_out_folder_is_made_again(self):
         p = self.process()
         self.assertEqual(self.say("hi")[0], 0)
-        rmtree(os.path.join(self.t, "process", "out"))   # #513's v2s-3: out/ was gone when its turn ended
+        logfiles.rmtree(os.path.join(self.t, "process", "out"))   # #513's v2s-3: out/ was gone when its turn ended
         rc, out, _ = self.say("User: again")
         self.assertEqual(rc, 0, out)
         self.assertIn("reply to: User: again", out)
@@ -648,7 +642,7 @@ class TestProcess(Base):
     def test_a_harness_error_is_named_and_stops_the_process(self):
         p = self.process()
         self.assertEqual(self.say("hi")[0], 0)
-        rmtree(os.path.join(self.t, "process", "out"))
+        logfiles.rmtree(os.path.join(self.t, "process", "out"))
         write(os.path.join(self.t, "process", "out"), "")   # a file where the folder goes
         rc, out, _ = self.say("User: again")
         self.assertEqual(rc, 1)
@@ -886,7 +880,7 @@ class TestSignedInHome(Base):
         self.assertEqual(rc, 1)
         self.assertIn("is a folder, not a link", err)
         self.assertTrue(os.path.isfile(os.path.join(self.link, "x")))
-        rmtree(self.profile)
+        logfiles.rmtree(self.profile)
         rc, _, err = run("signed-in-home", self.t)
         self.assertEqual(rc, 1)
         self.assertIn("no browser profile at", err)
@@ -934,7 +928,7 @@ for i in range(1, 41):
 class TestLock(unittest.TestCase):
     def test_two_processes_update_two_rows_and_both_are_kept(self):
         tmp = tempfile.mkdtemp()
-        self.addCleanup(rmtree, tmp)
+        self.addCleanup(logfiles.rmtree, tmp)
         runs, go, script = (os.path.join(tmp, n) for n in ("runs.jsonl", "go", "updater.py"))
         write(runs, "".join(json.dumps({"name": n, "round": 1}) + "\n" for n in ("v1h-1", "v1h-2")))
         write(script, UPDATER)
@@ -949,7 +943,7 @@ class TestLock(unittest.TestCase):
 class TestRecords(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        self.addCleanup(rmtree, self.tmp)
+        self.addCleanup(logfiles.rmtree, self.tmp)
         self.records = os.path.join(self.tmp, "records")
         self.projects = os.path.join(self.tmp, "projects")
 

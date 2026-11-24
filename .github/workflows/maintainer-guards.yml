@@ -1,0 +1,33 @@
+# Runs the shared-helper guards that scan maintainer/ as well as tools/ (tools/tests/test_logfiles.py's
+# OneRmtree: one logfiles.rmtree for a folder git wrote in, #24) on a change to a maintainer tool or
+# its tests, where template-scan.yml, which runs them on a change to tools/, does not run.
+# Linux only, on the oldest Python SETUP.md supports (3.11), as template-scan.yml runs them.
+# This repo's own CI: never exported to the Template.
+name: Maintainer guards
+
+on:
+  pull_request:
+    paths:
+      - "maintainer/*.py"
+      - "maintainer/tests/**"
+      - ".github/workflows/maintainer-guards.yml"
+
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going for the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run tools/tests/test_logfiles.py
+        run: python -I tools/tests/test_logfiles.py -v

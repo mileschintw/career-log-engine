@@ -4,7 +4,8 @@ built in a temporary directory.
 
   python3 -I tools/tests/test_logfiles.py
 """
-import ast, datetime, importlib.util, os, re, shutil, subprocess, sys, tempfile, time, unittest
+import ast, datetime, importlib.util, os, re, shutil, stat, subprocess, sys, tempfile, time, unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOL = os.path.join(HERE, "..", "logfiles.py")
@@ -287,8 +288,9 @@ class Files(unittest.TestCase):
 class Git(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.root, True)
+        self.addCleanup(logfiles.rmtree, self.root)
         self.run_git("init", "-q", "-b", "main")
+        logfiles.no_maintenance(self.root)   # it commits and pushes: no maintenance left running at cleanup
 
     def run_git(self, *args, cwd=None):
         subprocess.run(["git", "-C", cwd or self.root] + list(args), check=True, capture_output=True)
@@ -341,8 +343,9 @@ class Git(unittest.TestCase):
         self.assertIsNone(logfiles.default_branch(self.root))
         self.assertIsNone(logfiles.set_default_branch(self.root))   # no origin
         remote = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, remote, True)
+        self.addCleanup(logfiles.rmtree, remote)
         self.run_git("init", "-q", "--bare", "-b", "trunk", cwd=remote)
+        logfiles.no_maintenance(remote)   # it receives a push
         self.run_git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty",
                      "-m", "x")
         self.run_git("remote", "add", "origin", remote)
@@ -1002,6 +1005,116 @@ class KeyedFolder(unittest.TestCase):
             fails += ["%s:%d: a keyed folder made by hand" % (rel, line) for line in found]
         self.assertEqual(fails, [], "\n" + "\n".join(fails) + "\nCall logfiles.make_keyed_folder(parent, key_of): "
                          "it makes the folder of the first key not taken yet.")
+
+
+# ---- One rmtree for a folder git wrote in (#24) ----
+
+def py_sources(*folders):
+    """[(repo-relative path, source)] of each .py file at any depth under the repo's folders; a
+    folder that is not there (a Template's maintainer/) gives none."""
+    found = []
+    for folder in folders:
+        for top, dirs, names in os.walk(os.path.join(REPO, folder)):
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            for name in sorted(n for n in names if n.endswith(".py")):
+                path = os.path.join(top, name)
+                found.append((os.path.relpath(path, REPO).replace(os.sep, "/"), logfiles.read_text(path)))
+    return found
+
+
+def hand_rmtrees(source):
+    """[(line, source text)] of each rmtree by hand in a Python source, in line order: a function
+    named rmtree, a call that hands rmtree an error handler (onerror=, onexc= or a third argument,
+    shutil.rmtree's or one passed on, as addCleanup(shutil.rmtree, p, onerror=...)), and a
+    `from shutil import rmtree` that would hide one."""
+    def is_rmtree(node):
+        return (isinstance(node, ast.Attribute) and node.attr == "rmtree") or (
+            isinstance(node, ast.Name) and node.id == "rmtree")
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "rmtree":
+            found.append((node.lineno, "def rmtree"))
+        elif isinstance(node, ast.ImportFrom) and node.module == "shutil" and any(a.name == "rmtree" for a in node.names):
+            found.append((node.lineno, ast.unparse(node)))
+        elif isinstance(node, ast.Call):
+            handler = any(k.arg in ("onerror", "onexc") for k in node.keywords)
+            if (is_rmtree(node.func) and (handler or len(node.args) >= 3)) or (
+                    handler and any(is_rmtree(a) for a in node.args)):
+                found.append((node.lineno, ast.unparse(node)))
+    return sorted(found)
+
+
+class OneRmtree(unittest.TestCase):
+    """logfiles.rmtree, the one way a tool or a test removes a folder git wrote in, and the guard that
+    keeps it the one: tools/, skills/ and, in the Template's source, maintainer/ (#24: six copies and
+    six inline handlers had grown apart)."""
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.folder = os.path.join(self.tmp, "repo")
+        os.makedirs(os.path.join(self.folder, "objects", "ab"))
+        for rel in ("objects/ab/cdef", "objects/ab/0123", "HEAD"):
+            logfiles.write_text(os.path.join(self.folder, *rel.split("/")), "x")
+
+    def test_a_read_only_file(self):
+        # git writes its objects read-only; Windows will not delete a read-only file
+        for rel in ("objects/ab/cdef", "objects/ab/0123"):
+            os.chmod(os.path.join(self.folder, *rel.split("/")), stat.S_IREAD)
+        logfiles.rmtree(self.folder)
+        self.assertFalse(os.path.exists(self.folder))
+
+    def test_a_file_already_gone(self):
+        # a git process still running there (a detached gc) removes a file between listing and unlink
+        real = os.unlink
+        def gone_first(path, *args, **kwargs):
+            real(path, *args, **kwargs)
+            real(path, *args, **kwargs)   # FileNotFoundError, as if git had removed it
+        with mock.patch.object(os, "unlink", gone_first):
+            logfiles.rmtree(self.folder)
+        self.assertFalse(os.path.exists(self.folder))
+
+    def test_a_folder_already_gone(self):
+        logfiles.rmtree(os.path.join(self.tmp, "none"))
+        logfiles.rmtree(self.folder)
+        logfiles.rmtree(self.folder)
+
+    @unittest.skipUnless(HAS_GIT, "git not on PATH")
+    def test_no_maintenance(self):
+        subprocess.run(["git", "init", "-q", "--bare", self.folder + ".git"], check=True, capture_output=True)
+        logfiles.no_maintenance(self.folder + ".git")
+        self.assertEqual(logfiles.git(self.folder + ".git", "config", "maintenance.auto").strip(), "false")
+        self.assertEqual(logfiles.git(self.folder + ".git", "config", "gc.auto").strip(), "0")
+
+    def test_the_guard_reads_each_copied_form(self):
+        self.assertEqual([line for line, _ in hand_rmtrees(
+            "def rmtree(path):\n"                                                    # 1: the four test copies
+            "    shutil.rmtree(path, onerror=retry)\n"                               # 2
+            "shutil.rmtree(t, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))\n"  # 3: an inline handler
+            "self.addCleanup(shutil.rmtree, root, onerror=lambda f, p, e: f(p))\n"   # 4: one passed on
+            "shutil.rmtree(path, onexc=writable)\n"                                  # 5: harness.py's
+            "shutil.rmtree(path, False, retry)\n"                                    # 6: a third argument
+            "from shutil import rmtree as rm\n"                                      # 7: a hidden one
+            "rmtree(path, onexc=retry)\n"                                            # 8
+            "shutil.rmtree(t, ignore_errors=True)\n"                                 # no handler: no git folder
+            "self.addCleanup(shutil.rmtree, t, True)\n"
+            "logfiles.rmtree(t)\n"
+            "self.addCleanup(logfiles.rmtree, t)\n"
+            "os.walk(top, onerror=print)\n"
+            "# shutil.rmtree(p, onerror=retry) in a comment\n")], [1, 2, 3, 4, 5, 6, 7, 8])
+
+    def test_no_tool_or_test_removes_git_files_by_hand(self):
+        fails = []
+        for rel, source in py_sources("tools", "skills", "maintainer"):
+            found = hand_rmtrees(source)
+            if rel == "tools/logfiles.py":
+                if len(found) != 3:
+                    fails.append("tools/logfiles.py: rmtree is defined there once, with its two calls; found %r" % found)
+                continue
+            fails += ["%s:%d: rmtree by hand: %s" % (rel, line, text) for line, text in found]
+        self.assertEqual(fails, [], "\n" + "\n".join(fails) + "\nCall logfiles.rmtree(path) to remove a folder "
+                         "git wrote in: it removes git's read-only files and takes a file already gone as "
+                         "removed. Turn automatic maintenance off in the scratch repository first, right "
+                         "after git init or clone, with logfiles.no_maintenance(repo).")
 
 
 if __name__ == "__main__":
