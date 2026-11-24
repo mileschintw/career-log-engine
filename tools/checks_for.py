@@ -216,6 +216,8 @@ GROUPS = [
     ("coord", "coord-tests.yml", [
         "maintainer/coord.py", "maintainer/tests/test_coord.py", "tools/export-template.sh", "tools/deny_coverage.py",
         "tools/upgrade.py",
+        # its OneExportRunner reads every maintainer/*.py: a new one goes here too
+        "maintainer/devbuild.py", "maintainer/harness.py", "maintainer/prepush.py",
     ], [
         py("maintainer/tests/test_coord.py"),
     ]),
@@ -227,7 +229,7 @@ GROUPS = [
     ]),
     ("prepush", "coord-tests.yml", [
         "maintainer/prepush.py", "maintainer/hooks/pre-push", "maintainer/tests/test_prepush.py",
-        "tools/deny_coverage.py",
+        "tools/deny_coverage.py", "tools/export-template.sh",
     ], [
         py("maintainer/tests/test_prepush.py"),
     ]),
