@@ -58,10 +58,22 @@ class Numbers(unittest.TestCase):
 
     def test_reads_the_forms_from_upgrade(self):
         # #22: devbuild takes the forms from tools/upgrade.py; a form changed there changes here.
-        # tools/tests/test_logfiles.py's OneVersionForm fails on a form written anywhere else
+        # OneVersionForm below fails on a form written anywhere else
         with unittest.mock.patch.object(devbuild.upgrade, "VERSION", re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?\Z")):
             self.assertEqual(devbuild.release_tags(["v0.4.0", "v0.4.1-rc.2", "v0.4.1-dev.1"]), ["0.4.0"])
             self.assertEqual(devbuild.dev_number(["v0.4.1-rc.2", "v0.4.1-dev.5"], "0.4.1"), 3)
+
+
+class OneVersionForm(unittest.TestCase):
+    """#22: tools/tests/test_logfiles.py's OneVersionForm guard, for maintainer/*.py: the checks run
+    this file on a change there (coord-tests.yml), where they do not run test_logfiles.py."""
+
+    def test_no_maintainer_tool_writes_a_version_form_of_its_own(self):
+        spec = importlib.util.spec_from_file_location("test_logfiles", os.path.join(REPO, "tools", "tests",
+                                                                                     "test_logfiles.py"))
+        test_logfiles = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(test_logfiles)
+        self.assertEqual(test_logfiles.copied_version_forms("maintainer"), [])
 
 
 @unittest.skipUnless(shutil.which("sh") or os.name == "nt", "no sh to run tools/export-template.sh")

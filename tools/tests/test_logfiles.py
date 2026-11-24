@@ -710,22 +710,13 @@ def hand_html_parsers(source):
 class OneVersionForm(unittest.TestCase):
     """#22: the forms of a version are tools/upgrade.py's SEMVER and VERSION, with upgrade.key their
     order; maintainer/devbuild.py and tools/check.py take them. A version form's regex in another tool
-    (tools/*.py, and maintainer/*.py in the Template's source) fails, printing the file, the line and
-    what to use instead. tools/export-template.sh writes the form in sh, the one copy by hand (a shell
+    fails, printing the file, the line and what to use instead: here for tools/*.py, and in
+    maintainer/tests/test_devbuild.py, which the checks run on a change to maintainer/, for
+    maintainer/*.py. tools/export-template.sh writes the form in sh, the one copy by hand (a shell
     script cannot import it): tests/test_upgrade.py's VERSION_SAMPLES hold it the same."""
 
     def test_no_tool_writes_a_version_form_of_its_own(self):
-        root = os.path.dirname(os.path.dirname(os.path.abspath(TOOL)))
-        found = []
-        for folder in ("tools", "maintainer"):   # a Template has no maintainer/: glob finds nothing there
-            for path in sorted(glob_files(os.path.join(root, folder))):
-                if os.path.basename(path) == "upgrade.py" and folder == "tools":
-                    continue
-                with open(path, encoding="utf-8") as f:
-                    for line, text in version_forms(f.read(), path):
-                        found.append("%s:%d: %s (use upgrade.SEMVER, upgrade.VERSION, upgrade.key)"
-                                     % (os.path.relpath(path, root), line, text))
-        self.assertEqual(found, [])
+        self.assertEqual(copied_version_forms("tools", but="upgrade.py"), [])
 
     def test_the_guard_reads_each_copied_form(self):
         # maintainer/devbuild.py's two copies before #22, and other ways to write the form
@@ -735,7 +726,7 @@ class OneVersionForm(unittest.TestCase):
                      r'ok = re.match(r"\d+\.\d+\.\d+", v)',
                      r'ok = re.match(r"\d{1,3}[.]\d{1,3}[.]\d{1,3}", v)'):
             self.assertEqual(len(version_forms(copy)), 1, copy)
-        self.assertEqual(version_forms(r'"""A docstring: (\d+)\.(\d+)\.(\d+)."""' "\n"
+        self.assertEqual(version_forms(r'r"""A docstring: (\d+)\.(\d+)\.(\d+)."""' "\n"
                                        r'version += "-dev.%d" % n' "\n" r'DATE = r"\d{4}-\d{2}-\d{2}"' "\n"), [])
 
 
@@ -746,9 +737,18 @@ DOT = r"(?:\\\.|\[\.\])\(?"
 VERSION_FORM = re.compile(DIGITS + DOT + DIGITS + DOT + r"|-dev(?:\\\.|\[\.\])")
 
 
-def glob_files(folder):
-    """The *.py files right in folder, none when it is missing."""
-    return [os.path.join(folder, n) for n in os.listdir(folder) if n.endswith(".py")] if os.path.isdir(folder) else []
+def copied_version_forms(folder, but=None):
+    """`<path>:<line>: <text> (use ...)` for each version form's regex in the *.py files right in the
+    repo's folder, the file named but aside; none when the folder is missing (a Template's maintainer/)."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(TOOL)))
+    here = os.path.join(root, folder)
+    names = sorted(n for n in os.listdir(here) if n.endswith(".py") and n != but) if os.path.isdir(here) else []
+    found = []
+    for name in names:
+        with open(os.path.join(here, name), encoding="utf-8") as f:
+            found += ["%s/%s:%d: %s (use upgrade.SEMVER, upgrade.VERSION, upgrade.key)" % (folder, name, line, text)
+                      for line, text in version_forms(f.read(), name)]
+    return found
 
 
 def version_forms(source, name="<test>"):
