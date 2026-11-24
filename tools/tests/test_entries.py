@@ -684,7 +684,7 @@ class RulingsHitsTest(Log):
             " \"throughput\"" % W_PATH,
             "check: outputs/reports/2031-01-02-bio.md against %s:23; hit do-not-use outputs/reports/2031-01-02-bio.md:5"
             " \"820 ms\"" % W_PATH,
-            "left out: 2 sent outputs (application folders and Archived reports, frozen once sent): audit reads them",
+            "left out: 2 frozen outputs (application folders and Archived reports, frozen once sent): audit reads them",
             "OK: 2 outputs, 3 rulings, 4 hits"])
 
     def test_scoped_to_an_entry_with_no_hit(self):
@@ -693,7 +693,7 @@ class RulingsHitsTest(Log):
         self.assertEqual(code, 0)
         self.assertEqual(lines, [   # a right side only: nothing to report
             "ruling: entries/2031-02-lamp.md:20: Settled: both \"lamp\" and \"light\" are right (same). (src)",
-            "left out: 2 sent outputs (application folders and Archived reports, frozen once sent): audit reads them",
+            "left out: 2 frozen outputs (application folders and Archived reports, frozen once sent): audit reads them",
             "OK: 2 outputs, 1 rulings, 0 hits"])
 
     def test_scoped_to_several_entries_and_none_with_rulings(self):
@@ -707,6 +707,17 @@ class RulingsHitsTest(Log):
                          ["ruling: entries/2031-02-lamp.md", "ruling: %s" % W_PATH] + ["ruling: %s" % W_PATH] * 2)
         self.assertIn("check: outputs/resumes/backend against %s:23; hit do-not-use outputs/resumes/backend.tex:1"
                       " \"820 ms\"" % W_PATH, lines)
+
+    def test_scoped_names_an_unreadable_file(self):
+        self.write("outputs/resumes/backend.tex", "\\item 820 ms\n")
+        self.write("outputs/reports/2031-01-03-latin.md", "caf\xe9".encode("latin-1"), "wb")
+        code, lines = self.run_tool("rulings-hits", W_PATH, "--root", self.root)
+        self.assertEqual(code, 0)
+        self.assertEqual(lines[3:], [
+            "check: outputs/resumes/backend against %s:23; hit do-not-use outputs/resumes/backend.tex:1 \"820 ms\""
+            % W_PATH,
+            "unreadable: outputs/reports/2031-01-03-latin.md (not UTF-8 text: read it yourself against every ruling)",
+            "OK: 2 outputs, 3 rulings, 1 hits"])
 
     def test_scoped_takes_entries_only(self):
         code, lines = self.run_tool("rulings-hits", "profile.md", "--root", self.root)

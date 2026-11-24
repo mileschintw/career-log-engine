@@ -165,12 +165,14 @@ entry is over the threshold at more than THRESHOLD tokens, half of what Read ret
     still state the ruled-out claim in other words;
   - `OK: <n> outputs, <n> rulings, <n> pairs, <n> hits`. Exit 0.
   With `<entry>...` (the end of a mode that wrote or changed those entries' `## Conflicts` rulings,
-  SKILL.md › Checks at the end), it reads only those entries' rulings, against the outputs not
-  yet sent: the targets and the reports that are not Archived. Application folders (write freezes a
-  folder once it is sent, and the Log records no send) and Archived reports are left for audit. It
-  prints each `ruling:` line, a `check:` line only for a pair with a `wrong` or `do-not-use` hit,
-  listing those hits alone, then `left out: <n> sent outputs ...` when there are any, and `OK: <n>
-  outputs, <n> rulings, <n> hits`. Exit 0.
+  SKILL.md › Checks at the end), it reads only those entries' rulings (profile.md's left out),
+  against the outputs a later run still changes: the targets (a target run overwrites one in place;
+  a version sent earlier stays at its commit) and the reports that are not Archived. Application
+  folders (write freezes one once the user sends it, and no file records whether they have) and
+  Archived reports are frozen, and left for audit. It prints each `ruling:` line, an `unreadable:`
+  line as above, a `check:` line only for a pair with a `wrong` or `do-not-use` hit, listing those
+  hits alone, then `left out: <n> frozen outputs ...` when there are any, and `OK: <n> outputs,
+  <n> rulings, <n> hits`. Exit 0.
 
 Writes, and `state`, which reads what the modes decide on (each write edits in place and leaves
 every other byte of the file as it was, its byte order mark and line ends included):
@@ -1576,52 +1578,29 @@ def quote_pattern(q):
     return (r"(?<![a-z0-9])" if edge(q[0]) else "") + body + (r"(?![a-z0-9])" if edge(q[-1]) else "")
 
 
-SCOPED_SIDES = ("wrong", "do-not-use")   # the hits a scoped run reports: a wording the ruling rules out
+def output_texts(root, files):
+    """{file: output_text} of an output's readable files, after an `unreadable:` line for each other."""
+    texts = {f: output_text(root, f) for f in files}
+    for f in [f for f, t in texts.items() if t[0] is None]:
+        print("unreadable: %s (not UTF-8 text: read it yourself against every ruling)" % f)
+        del texts[f]
+    return texts
 
 
-def is_sent(root, name):
-    """Whether an output of outputs() is frozen once sent, so a scoped rulings-hits leaves it to audit:
-    an application folder (the Log records no send, and write freezes a folder once the user sends
-    it) or an Archived report (write › Save levels)."""
-    if name.startswith("outputs/applications/"):
-        return True
-    if name.startswith("outputs/reports/"):
-        import check_save   # it imports this module: imported here, not at the top
-        try:
-            return check_save.report_marks(read(os.path.join(root, name)))[1]
-        except (OSError, UnicodeDecodeError):
-            return False
-    return False
+def check_line(name, path, n, hits):
+    return "check: %s against %s:%d%s" % (name, path, n, "".join("; " + h for h in hits))
 
 
-def cmd_rulings_hits(root, scope=None):
-    """rulings-hits; with scope (entry paths), only those entries' rulings, against the outputs not
-    yet sent, reporting their wrong and do-not-use hits."""
+def cmd_rulings_hits(root):
     entries = load(root)
-    found = rulings(root, [e for p in scope for e in entries if e.path == p] if scope is not None else entries)
-    if scope is not None:
-        found = [r for r in found if r[0] != "profile.md"]
+    found = rulings(root, entries)
     for path, n, line in found:
         print("ruling: %s:%d: %s" % (path, n, line))
     quotes = [ruling_quotes(line) for _, _, line in found]
     pairs = hits = 0
     outs = outputs(root)
-    if scope is not None:
-        sent = [o for o in outs if is_sent(root, o[0])]
-        outs = [o for o in outs if o not in sent]
     for name, prov, files in outs:
-        texts = {f: output_text(root, f) for f in files}
-        for f in [f for f, t in texts.items() if t[0] is None]:
-            if scope is None:
-                print("unreadable: %s (not UTF-8 text: read it yourself against every ruling)" % f)
-            del texts[f]
-        if scope is not None:
-            for k, (path, n, _) in enumerate(found):
-                found_hits = scoped_hits(texts, quotes[k])
-                hits += len(found_hits)
-                if found_hits:
-                    print("check: %s against %s:%d%s" % (name, path, n, "".join("; " + h for h in found_hits)))
-            continue
+        texts = output_texts(root, files)
         named, unresolved = set(), []
         prov_text = None
         if prov and os.path.isfile(os.path.join(root, prov)):
@@ -1640,14 +1619,55 @@ def cmd_rulings_hits(root, scope=None):
             if path in named or path == "profile.md" or found_hits:
                 pairs += 1
                 hits += len(found_hits)
-                print("check: %s against %s:%d%s" % (name, path, n, "".join("; " + h for h in found_hits)))
-    if scope is not None:
-        if sent:
-            print("left out: %d sent outputs (application folders and Archived reports, frozen once sent): audit"
-                  " reads them" % len(sent))
-        print("OK: %d outputs, %d rulings, %d hits" % (len(outs), len(found), hits))
-        return 0
+                print(check_line(name, path, n, found_hits))
     print("OK: %d outputs, %d rulings, %d pairs, %d hits" % (len(outs), len(found), pairs, hits))
+    return 0
+
+
+SCOPED_SIDES = ("wrong", "do-not-use")   # the hits a scoped run reports: a wording the ruling rules out
+
+
+def is_frozen(root, name):
+    """Whether an output of outputs() is frozen once sent, so a scoped rulings-hits leaves it to audit:
+    an application folder (write freezes it once the user sends it, and no file records whether they
+    have) or an Archived report (write › Save levels)."""
+    if name.startswith("outputs/applications/"):
+        return True
+    if name.startswith("outputs/reports/"):
+        import check_save   # it imports this module: imported here, not at the top
+        try:
+            _, archived = check_save.report_marks(read(os.path.join(root, name)))
+        except (OSError, UnicodeDecodeError):
+            return False
+        return archived
+    return False
+
+
+def cmd_rulings_hits_scoped(root, scope):
+    """rulings-hits <entry>...: only those entries' rulings, against the outputs a later run still
+    changes, with their wrong and do-not-use hits."""
+    entries = {e.path: e for e in load(root)}
+    found = [r for r in rulings(root, [entries[p] for p in scope if p in entries]) if r[0] != "profile.md"]
+    for path, n, line in found:
+        print("ruling: %s:%d: %s" % (path, n, line))
+    quotes = [ruling_quotes(line) for _, _, line in found]
+    outs, frozen, hits = [], 0, 0
+    for out in outputs(root):
+        if is_frozen(root, out[0]):
+            frozen += 1
+        else:
+            outs.append(out)
+    for name, _, files in outs:
+        texts = output_texts(root, files)
+        for (path, n, _), q in zip(found, quotes):
+            found_hits = [h for side, h in ruling_hits(texts, q) if side in SCOPED_SIDES]
+            hits += len(found_hits)
+            if found_hits:
+                print(check_line(name, path, n, found_hits))
+    if frozen:
+        print("left out: %d frozen outputs (application folders and Archived reports, frozen once sent): audit"
+              " reads them" % frozen)
+    print("OK: %d outputs, %d rulings, %d hits" % (len(outs), len(found), hits))
     return 0
 
 
@@ -1669,11 +1689,6 @@ def ruling_hits(texts, quotes):
                 line = max(i for i, s in enumerate(starts, 1) if s <= matches[0].start())
                 out.append((side, 'hit %s %s:%d "%s"' % (side, f, line, raw)))
     return out
-
-
-def scoped_hits(texts, quotes):
-    """The hit texts of ruling_hits whose side a scoped run reports (SCOPED_SIDES)."""
-    return [h for side, h in ruling_hits(texts, quotes) if side in SCOPED_SIDES]
 
 
 # ---- Stories ----
@@ -4794,7 +4809,7 @@ def main(argv):
         if cmd == "check":
             return cmd_check(root, today, [entry_arg(root, a) for a in rest] if consolidated else None)
         if cmd == "rulings-hits":
-            return cmd_rulings_hits(root, [entry_arg(root, a) for a in rest] if rest else None)
+            return cmd_rulings_hits_scoped(root, [entry_arg(root, a) for a in rest]) if rest else cmd_rulings_hits(root)
         if cmd == "story-coverage":
             if "--interviewers" in opts and not re.fullmatch(r"[1-9][0-9]*", opts["--interviewers"]):
                 return bad("--interviewers takes a whole number, 1 or more: the stage's interviewers")

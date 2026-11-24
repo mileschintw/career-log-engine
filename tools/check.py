@@ -1549,13 +1549,13 @@ def stale_nexts(root, guide, base, example=True):
         behind = [(path, "changed") for path, _, _ in res["changed"]] + [(path, "new") for path, _, _ in res["new"]]
         if len(behind) < STALE_AT:
             continue
-        runs = [r.split(" ", 2) for r in (git_out(root, "log", "--format=%H %ct %s", "%s..%s" % (saved, base))
-                                          or "").splitlines()]
-        last = next((r for r in runs if len(r) == 3 and r[2].startswith(STALE_RUNS)), None)
+        commits = (git_out(root, "log", "--format=%H %ct %s", "%s..%s" % (saved, base)) or "").splitlines()
+        # the last earlier run whose Next up held the line: (sha, commit time)
+        last = next(((sha, int(when)) for sha, when, subject in (c.split(" ", 2) for c in commits if c.count(" ") >= 2)
+                     if subject.startswith(STALE_RUNS)), None)
         if last and behind_at(root, res, saved, last[0]) >= STALE_AT:
-            start = int(git_out(root, "log", "-1", "--format=%ct", saved))
-            now = int(git_out(root, "log", "-1", "--format=%ct", "HEAD"))
-            if (now - start) // STALE_WEEK <= (int(last[1]) - start) // STALE_WEEK:
+            week = lambda when: (when - int(git_out(root, "log", "-1", "--format=%ct", saved))) // STALE_WEEK
+            if week(int(git_out(root, "log", "-1", "--format=%ct", "HEAD"))) <= week(last[1]):
                 continue   # a run showed it this week already
         named = ", ".join("%s (%s, %s)" % (titles.get(path, path), path, how) for path, how in behind[:NAMED])
         more = " and %d more" % (len(behind) - NAMED) if len(behind) > NAMED else ""
