@@ -118,3 +118,5 @@ PR #56 merged，關閉 #52；master push run 在 d216eb1e 通過（Dev build v0.
 - **Merge right:** 2026-11-23 22:55 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第三輪的三條 lane 嗎？）：lanes e52、e17、e29。
 
 2026-11-24 00:44 -0800 使用者說「Archive 並刪分支」：第三輪三個 lane session（e52、e17、e29）已 archive（worktree 乾淨、都已在 master），三條遠端分支 `claude/lane-e52-366592`、`claude/lane-e17-18146b`、`claude/lane-e29-8c9454` 已刪。
+
+- **第四輪（2026-11-24 04:20 -0800）：** 使用者 picked「1、2、3 都做」。#28 triage 成 ready-for-agent，issue 補了 Decision、Acceptance criteria、Files。
