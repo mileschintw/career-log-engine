@@ -52,7 +52,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第二輪結束後（since 2026-11-23 18:15 -0800）：** archive e46、e37、e24 的 session 並刪它們的遠端分支；下一輪（建議 #52、#49；#17、#28、#29 先 triage）；Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
+- **第二輪結束後（since 2026-11-23 18:15 -0800）：** 下一輪（建議 #52，並加一個從 import 推出觸發清單、漏列就失敗的測試；#49；#17、#28、#29 先 triage）；Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
 
 ## Deadlines
 
