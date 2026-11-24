@@ -104,3 +104,15 @@ PR #55 merged，關閉 #29；master push run 在 662a9ea5 通過（Dev build）�
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | 1 | none | none | `maintainer/harness.py › copy`、`docs/maintaining-tests.md › Harness` | 第三輪 lane e29 |
 
 - **e52 第 4 輪 review 仍有 blocker（since 2026-11-24 00:30 -0800）：** fix（約 10 行，對不到 repo 檔的 untold join 算 untold）再跑第 5 輪，或 revert 回 457f2c2 的讀法。建議 fix。 → 使用者 picked「Fix，跑第 5 輪」。
+
+## e52 merged（2026-11-24 08:36Z）
+
+PR #56 merged，關閉 #52；master push run 在 d216eb1e 通過（Dev build v0.4.2-dev.17）。guard `EveryImport` 以 check 為單位判定涵蓋，`template_checks.py` 的 import 放在 `LEFT_OUT`（理由在 PR body）。報告 `reports/e52.md`。Now 列：
+
+- **Merge right:** 2026-11-23 22:55 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第三輪的三條 lane 嗎？）：lanes e52、e17、e29。
+| e52 | pr | #52 | local_524d3b89-26bb-4cc4-bfe1-b067c354ad7a（落在 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e52-366592`） | PR #56 open, waitchecks | — |
+| #52 maintainer 工具 import `tools/logfiles.py`，但 coord／dev build／prepush 群組和 `coord-tests.yml` 沒列 | 1 | none | none | `tools/checks_for.py › GROUPS`、`coord-tests.yml › paths:`、`tools/tests/test_checks_for.py` | 第三輪 lane e52 |
+
+## 第三輪結束（2026-11-24 00:37 -0800）
+
+- **Merge right:** 2026-11-23 22:55 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第三輪的三條 lane 嗎？）：lanes e52、e17、e29。

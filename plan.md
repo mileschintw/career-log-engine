@@ -9,13 +9,13 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23 22:55 -0800）：** 第三輪開工：e52、e17、e29。開 session、寫 Now 列、設鬧鐘；PR CI 過就 merge。
+- **Next（2026-11-24 00:37 -0800）：** 第三輪三條 lane 全部 merge（#54、#55、#56），最新 Dev build v0.4.2-dev.17。沒有 lane、沒有鬧鐘。等使用者：archive 第三輪三個 session 和刪分支、#28、Log 升級 prompt。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** 2026-11-23 22:55 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第三輪的三條 lane 嗎？）：lanes e52、e17、e29。
+- **Merge right:** none（第三輪的已結束，在 `plan-history.md`〈第三輪結束〉）
 - **Unattended log:** none
 
 ## Rulings
@@ -30,7 +30,6 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e52 | pr | #52 | local_524d3b89-26bb-4cc4-bfe1-b067c354ad7a（落在 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e52-366592`） | PR #56 open, waitchecks | — |
 
 **Main checkout:** none.
 
@@ -42,7 +41,6 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 |---|---|---|---|---|---|
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：要使用者在 Direction 的四個選項裡選（建議先 1、3，2、4 等量過成本） |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #52 maintainer 工具 import `tools/logfiles.py`，但 coord／dev build／prepush 群組和 `coord-tests.yml` 沒列 | 1 | none | none | `tools/checks_for.py › GROUPS`、`coord-tests.yml › paths:`、`tools/tests/test_checks_for.py` | 第三輪 lane e52 |
 
 ## Waiting for the user to be present
 
@@ -50,7 +48,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第三輪結束後：** #28（四個選項選哪些，建議先 1、3）；Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
+- **第三輪結束後（since 2026-11-24 00:37 -0800）：** archive e52、e17、e29 的 session 並刪它們的遠端分支；#28（四個選項選哪些，建議先 1、3）；Log 升到最新 Dev build（v0.4.2-dev.17）的 prompt（寫到私人記錄）。
 
 ## Deadlines
 
