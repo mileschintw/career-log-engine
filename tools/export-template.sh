@@ -21,9 +21,14 @@ VERSION=next
 DEV=
 if [ "${1:-}" = "--version" ]; then
   VERSION=${2:?$USAGE}; shift 2
-  if printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+-dev\.[1-9][0-9]*'; then
+  # tools/upgrade.py's SEMVER and VERSION, the one definition: a table of samples in
+  # tools/tests/test_upgrade.py runs against both (#22). grep matches each line alone: one line only
+  ONE_LINE=1
+  case $VERSION in *"
+"*) ONE_LINE= ;; esac
+  if [ -n "$ONE_LINE" ] && printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+-dev\.[1-9][0-9]*'; then
     DEV=1
-  elif ! printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+  elif [ -z "$ONE_LINE" ] || ! printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
     echo "refusing: --version takes a semver such as 0.2.0, or a Dev build's such as 0.2.1-dev.1, not $VERSION"; exit 1
   fi
 fi

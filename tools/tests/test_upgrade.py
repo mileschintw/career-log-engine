@@ -677,6 +677,20 @@ class Upgrade(unittest.TestCase):
         self.assertFalse(upgrade.SEMVER.match("0.3.2-dev.1"))   # a release, as check.py's update line reads it
 
 
+# Sample versions, each with whether it is one: a release x.y.z, or a Dev build x.y.z-dev.<n> with n
+# from 1. upgrade.VERSION and the export's --version check each say the same (#22); maintainer/devbuild.py
+# takes upgrade.py's, and tests/test_logfiles.py's OneVersionForm fails on a form written in another tool.
+VERSION_SAMPLES = [
+    ("0.4.1", True), ("0.10.0", True), ("12.0.3", True),
+    ("0.4.1-dev.1", True), ("0.4.1-dev.10", True), ("1.0.0-dev.123", True),
+    ("0.x", False), ("0.4", False), ("0.4.1.2", False), ("v0.4.1", False), ("v0.4.1-dev.1", False),
+    ("0.4.1-dev", False), ("0.4.1-dev.0", False), ("0.4.1-dev.01", False), ("0.4.1-dev.x", False),
+    ("0.4.1-dev.1.2", False), ("0.4.1-DEV.1", False), ("0.4.1-rc.1", False), ("-0.4.1", False),
+    (" 0.4.1", False), ("0.4.1 ", False), ("0.4.1\n", False), ("0.4.1\n0.4.2", False),
+    ("١.٢.٣", False),   # Arabic-Indic digits, which Python's \d takes
+]
+
+
 @unittest.skipUnless(shutil.which("sh"), "no sh on PATH")
 @unittest.skipUnless(GIT, NOT_GIT)
 class Export(unittest.TestCase):
@@ -726,11 +740,50 @@ class Export(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("personal content: /allowlist/", out)
 
-    def test_version_must_be_semver(self):
-        for bad in ("0.x", "0.4.1-dev", "0.4.1-dev.0", "0.4.1-rc.1", "v0.4.1-dev.1"):
-            rc, out = self.export("--version", bad)
-            self.assertEqual(rc, 1, bad)
-            self.assertIn("takes a semver", out)
+    def export_takes(self, version):
+        """Whether the export's --version check takes version. One it takes goes on to the next
+        refusal, a dest that is not empty, so no sample runs a whole export. The version goes through
+        the environment: on Windows an argument's newline splits it in two."""
+        dest = os.path.join(self.tmp, "full")
+        os.makedirs(os.path.join(dest, "x"), exist_ok=True)
+        r = subprocess.run(["sh", "-c", 'exec sh tools/export-template.sh --version "$VERSION_SAMPLE" "$DEST"'],
+                           cwd=self.src, env=dict(os.environ, VERSION_SAMPLE=version, DEST=dest),
+                           capture_output=True, encoding="utf-8", errors="replace")
+        rc, out = r.returncode, r.stdout
+        self.assertEqual(rc, 1, out)
+        if "takes a semver" in out:
+            return False
+        self.assertIn("is not empty", out)
+        return True
+
+    def disagreements(self, pattern, export_verdicts):
+        """(sample, is it a version, pattern's verdict, the export's) for each sample of VERSION_SAMPLES
+        either check gets wrong; export_verdicts maps each sample to the export's verdict."""
+        return [(v, good, pattern.match(v) is not None, export_verdicts[v]) for v, good in VERSION_SAMPLES
+                if (pattern.match(v) is not None, export_verdicts[v]) != (good, good)]
+
+    def test_version_samples(self):
+        # #22: one form of a version, written in tools/upgrade.py and in the export's --version check
+        export_verdicts = {v: self.export_takes(v) for v, _ in VERSION_SAMPLES}
+        self.assertEqual(self.disagreements(upgrade.VERSION, export_verdicts), [])
+
+    def test_version_samples_catch_a_check_that_disagrees(self):
+        # a Dev build numbered from 0, planted in the export's check alone, fails the table
+        script = os.path.join(self.src, "tools", "export-template.sh")
+        with open(script, encoding="utf-8", newline="") as f:
+            text = f.read()
+        self.assertIn(r"-dev\.[1-9][0-9]*'", text)
+        with open(script, "w", encoding="utf-8", newline="") as f:
+            f.write(text.replace(r"-dev\.[1-9][0-9]*'", r"-dev\.[0-9]+'"))
+        export_verdicts = {v: self.export_takes(v) for v, _ in VERSION_SAMPLES}
+        self.assertEqual(self.disagreements(upgrade.VERSION, export_verdicts),
+                         [("0.4.1-dev.0", False, False, True), ("0.4.1-dev.01", False, False, True)])
+        # and upgrade.VERSION as it was before #22, with the export's own verdicts right: its $ takes a
+        # final newline, and its \d takes any script's digits
+        export_verdicts = {v: good for v, good in VERSION_SAMPLES}
+        before = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-dev\.([1-9]\d*))?$")
+        self.assertEqual(self.disagreements(before, export_verdicts),
+                         [("0.4.1\n", False, True, False), ("١.٢.٣", False, True, False)])
 
     def next_guide(self, change):
         """upgrade-next.* reset to the empty skeleton, with a Log format change in the .md when change."""

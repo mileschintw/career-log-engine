@@ -64,9 +64,13 @@ SKELETON_ENGINE = [".github"]   # Engine paths the export takes from tools/templ
 # older Log upgrades to BRIDGE first, whose tool still reads the stamps of 0.1.0 and before (ADR 0011)
 FLOOR = "0.2.0"
 BRIDGE = "0.3.2"
-SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")   # a release
-# A release or a Dev build, `<next version>-dev.<n>` from 1 (tools/export-template.sh stamps the same)
-VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-dev\.([1-9]\d*))?$")
+# The forms of a version, the one definition (#22): maintainer/devbuild.py and tools/check.py take them
+# from here, and tools/export-template.sh's --version check writes the same in sh; one table of samples
+# in tests/test_upgrade.py runs against both. ASCII digits only and \Z, not $: Python's \d takes any
+# script's digits and its $ a final newline, as the export's check does not
+SEMVER = re.compile(r"^([0-9]+)\.([0-9]+)\.([0-9]+)\Z")   # a release
+# A release or a Dev build, `<next version>-dev.<n>` from 1
+VERSION = re.compile(r"^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-dev\.([1-9][0-9]*))?\Z")
 GUIDE = "docs/upgrades/upgrade-%s.%s"
 NEXT_GUIDE = "next"   # a Dev build's guide: upgrade-next.*, the next release's guide as it stood
 # The front pages, with the heading of their entries section (tools/config.py reads above it)

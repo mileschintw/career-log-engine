@@ -5,7 +5,7 @@ nothing reaches GitHub.
 
   python3 -I maintainer/tests/test_devbuild.py
 """
-import filecmp, importlib.util, io, os, shutil, subprocess, sys, tarfile, tempfile, unittest, unittest.mock
+import filecmp, importlib.util, io, os, re, shutil, subprocess, sys, tarfile, tempfile, unittest, unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -38,17 +38,42 @@ def run(*argv):
 
 class Numbers(unittest.TestCase):
     def test_next_version(self):
-        self.assertEqual(devbuild.next_version((0, 4, 0), False), "0.4.1")
-        self.assertEqual(devbuild.next_version((0, 4, 2), True), "0.5.0")
+        self.assertEqual(devbuild.next_version("0.4.0", False), "0.4.1")
+        self.assertEqual(devbuild.next_version("0.4.2", True), "0.5.0")
 
     def test_dev_number(self):
-        tags = ["v0.4.1-dev.1", "v0.4.1-dev.10", "v0.4.1-dev.2", "v0.5.0-dev.7", "v0.4.1", "v0.4.1-dev.x"]
+        tags = ["v0.4.1-dev.1", "v0.4.1-dev.10", "v0.4.1-dev.2", "v0.5.0-dev.7", "v0.4.1", "v0.4.1-dev.x",
+                "v0.4.10-dev.30", "v0.4.1-dev.01", "0.4.1-dev.40"]
         self.assertEqual(devbuild.dev_number(tags, "0.4.1"), 11)
         self.assertEqual(devbuild.dev_number(tags, "0.4.2"), 1)   # starts at 1 after a release
 
     def test_release_tags(self):
-        self.assertEqual(devbuild.release_tags(["v0.4.0", "v0.10.1", "v0.4.1-dev.1", "0.5.0", "v1.2"]),
-                         [(0, 4, 0), (0, 10, 1)])
+        self.assertEqual(devbuild.release_tags(["v0.4.0", "v0.10.1", "v0.4.1-dev.1", "0.5.0", "v1.2",
+                                                "v١.٢.٣", "v0.4.0\n"]),
+                         ["0.4.0", "0.10.1"])
+
+    def test_latest_release_in_upgrades_order(self):
+        self.assertEqual(devbuild.latest_release(["v0.9.0", "v0.10.0", "v0.10.1-dev.3", "v0.2.0"]), "0.10.0")
+        self.assertIsNone(devbuild.latest_release(["v0.4.1-dev.1", "main"]))
+
+    def test_reads_the_forms_from_upgrade(self):
+        # #22: devbuild takes the forms from tools/upgrade.py; a form changed there changes here.
+        # OneVersionForm below fails on a form written anywhere else
+        with unittest.mock.patch.object(devbuild.upgrade, "VERSION", re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?\Z")):
+            self.assertEqual(devbuild.release_tags(["v0.4.0", "v0.4.1-rc.2", "v0.4.1-dev.1"]), ["0.4.0"])
+            self.assertEqual(devbuild.dev_number(["v0.4.1-rc.2", "v0.4.1-dev.5"], "0.4.1"), 3)
+
+
+class OneVersionForm(unittest.TestCase):
+    """#22: tools/tests/test_logfiles.py's OneVersionForm guard, for maintainer/*.py: the checks run
+    this file on a change there (coord-tests.yml), where they do not run test_logfiles.py."""
+
+    def test_no_maintainer_tool_writes_a_version_form_of_its_own(self):
+        spec = importlib.util.spec_from_file_location("test_logfiles", os.path.join(REPO, "tools", "tests",
+                                                                                     "test_logfiles.py"))
+        test_logfiles = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(test_logfiles)
+        self.assertEqual(test_logfiles.copied_version_forms("maintainer"), [])
 
 
 @unittest.skipUnless(shutil.which("sh") or os.name == "nt", "no sh to run tools/export-template.sh")
