@@ -181,43 +181,71 @@ def reads(rel, root=REPO):
     those its import statements name (anywhere in the file), resolved in its own folder, then in
     tools/, where every file that imports a tool puts it on sys.path; and those it loads by path or
     by name: importlib.util.spec_from_file_location, importlib.import_module and __import__, whose
-    argument value() can tell, a helper's parameter taking each constant its calls in the file pass.
-    Anything else, a standard or third-party module included, is not a repo module and is left out.
-    untold: (rel, the argument's source) for each load by path or name whose argument value()
-    cannot tell with any of those constants: a module the guard may miss, unless UNTOLD names it."""
+    argument value() can tell: with the file's constants, the function's own, and, in a function the
+    file calls by name (`f(...)` or `self.f(...)`), each call's arguments for the parameters, one
+    call at a time. A name bound more than once or other than by `name = <value>` in its scope is
+    not a constant. Anything else, a standard or third-party module included, is not a repo module
+    and is left out. untold: (rel, the argument's source) for each load by path or name whose
+    argument value() cannot tell for one of those calls: a module the guard may miss, unless UNTOLD
+    names it."""
     path = os.path.join(root, rel)
     with open(path, encoding="utf-8") as f:
         source = f.read()
     tree = ast.parse(source, rel)
-    def assigned(stmts, env):
-        """env with the names stmts assign a value() it can tell (the first such assignment)."""
-        env = dict(env)
-        for stmt in stmts:
-            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-                got = value(stmt.value, env, path)
+    functions = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+
+    def own(scope):
+        """The nodes of scope outside the functions within it."""
+        inner = {id(m) for n in ast.walk(scope) if n is not scope and isinstance(n, functions) for m in ast.walk(n)}
+        return [n for n in ast.walk(scope) if id(n) not in inner]
+
+    def constants(nodes, env):
+        """env, less every name nodes bind, plus each name they bind once, by `name = <value>`,
+        whose value value() can tell, in the order of the source."""
+        bound = {}
+        for n in nodes:
+            if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)):
+                bound[n.id] = bound.get(n.id, 0) + 1
+            elif isinstance(n, ast.alias):
+                bound[(n.asname or n.name).split(".")[0]] = 2
+            elif isinstance(n, ast.arg):
+                bound[n.arg] = 2
+        env = {k: v for k, v in env.items() if k not in bound}
+        for n in sorted((n for n in nodes if isinstance(n, ast.Assign)), key=lambda n: (n.lineno, n.col_offset)):
+            target = n.targets[0]
+            if len(n.targets) == 1 and isinstance(target, ast.Name) and bound[target.id] == 1:
+                got = value(n.value, env, path)
                 if got is not None:
-                    env.setdefault(stmt.targets[0].id, got)
+                    env[target.id] = got
         return env
-    env = assigned(tree.body, {})   # the module's constants: HERE, TOOLS, TOOL and the like
+
+    env = constants(own(tree), {})   # the module's constants: HERE, TOOLS, TOOL and the like
     calls = {}   # a function's name: the positional arguments value() tells of each call to it
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, (ast.Name, ast.Attribute)):
-            name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+        if isinstance(node, ast.Call):
+            f = node.func
+            if isinstance(f, ast.Name):
+                name = f.id
+            elif isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id == "self":
+                name = f.attr
+            else:
+                continue
             calls.setdefault(name, []).append([value(a, env, path) for a in node.args])
     paths, names, untold = set(), set(), []
-    for scope in [tree] + [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
-        nested = [n for n in ast.walk(scope) if n is not scope and isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-        inner = {id(m) for n in nested for m in ast.walk(n)}
+    for scope in [tree] + [n for n in ast.walk(tree) if isinstance(n, functions)]:
+        nodes = own(scope)
         envs = [env]
-        if scope is not tree:   # its own assignments, and each call's constants for the parameters
+        if scope is not tree:   # each call's arguments for the parameters, then its own constants
             params = [a.arg for a in scope.args.posonlyargs + scope.args.args]
-            envs += [dict(env, **{p: a for p, a in zip(params, args) if a is not None})
-                     for args in calls.get(scope.name, [])]
-            local = [n for n in ast.walk(scope) if isinstance(n, ast.Assign) and id(n) not in inner]
-            envs = [assigned(local, e) for e in envs]
-        for node in ast.walk(scope):
-            if id(node) in inner:   # read with the function it is in
-                continue
+            if isinstance(scope, ast.Lambda) or scope.name not in calls:
+                bindings = [{}]
+            else:
+                bindings = [{p: a for p, a in zip(params, args) if a is not None} for args in calls[scope.name]]
+            signature = {id(n) for n in ast.walk(scope.args)}
+            body = [n for n in nodes if id(n) not in signature]
+            outer = {k: v for k, v in env.items() if k not in params}   # a parameter hides a constant
+            envs = [constants(body, dict(outer, **b)) for b in bindings]
+        for node in nodes:
             if isinstance(node, ast.Import):
                 names.update(a.name.split(".")[0] for a in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -230,9 +258,9 @@ def reads(rel, root=REPO):
                     arg, into = node.args[0], names
                 else:
                     continue
-                got = {value(arg, e, path) for e in envs} - {None}
-                into.update(got)
-                if not got:
+                got = [value(arg, e, path) for e in envs]
+                into.update(g for g in got if g is not None)
+                if None in got:
                     untold.append((rel, ast.get_source_segment(source, arg)))
     out = set()
     for p in paths - {None}:
@@ -260,12 +288,14 @@ UNTOLD = {
     ("tools/tests/test_upgrade.py", 'os.path.join(REPO, "docs", "upgrades", name)'): ["docs/upgrades/"],
     # a scratch Log's copy of tools/config.py, which the test wrote: not this repo's file
     ("tools/tests/test_upgrade.py", 'os.path.join(log, "tools", "config.py")'): [],
+    # log_tool(root, name): the Log's own tools/<name>.py, which the guide upgrades; the calls pass "entries"
+    ("docs/upgrades/upgrade-0.4.0.py", 'os.path.join(root, "tools", name + ".py")'): ["tools/entries.py"],
 }
 
 
 def imported(rel, root=REPO, untold=None, told=UNTOLD):
     """rel and every repo module it loads, directly or through other repo modules (reads()), and
-    the paths told names for an untold load; each untold load told does not name is appended to
+    the paths told names for an untold load; each untold load, named in told or not, is appended to
     untold when given."""
     seen, todo = set(), [rel]
     while todo:
@@ -273,15 +303,16 @@ def imported(rel, root=REPO, untold=None, told=UNTOLD):
         if p in seen:
             continue
         seen.add(p)
-        if not p.endswith(".py"):   # a folder told names
+        if p.endswith("/"):   # a folder told names: the modules in it
+            folder = os.path.join(root, p)
+            todo += sorted(p + n for n in os.listdir(folder) if n.endswith(".py")) if os.path.isdir(folder) else []
             continue
         modules, unknown = reads(p, root)
         todo += modules
         for load in unknown:
-            if load in told:
-                todo += told[load]
-            elif untold is not None:
-                untold.append(load)
+            todo += told.get(load, [])
+        if untold is not None:
+            untold += unknown
     return seen
 
 
@@ -317,7 +348,7 @@ def import_gaps(groups, root=REPO, workflows=None, left_out=LEFT_OUT, told=UNTOL
         found = imported(script, root, untold, told)
         problems += ["%s loads a module from %s's %s, which the guard cannot tell: make it a constant or "
                      "os.path.join of the file's constants, or list it in UNTOLD with what it loads"
-                     % (script, f, arg) for f, arg in sorted(set(untold))]
+                     % (script, f, arg) for f, arg in sorted(set(untold) - set(told))]
         for module in sorted(found):
             if (script, module) not in left_out and not any(checks_for.matches(module, t) for t in triggers):
                 problems.append("%s imports %s: no group that runs it (%s) has it in tools/checks_for.py GROUPS"
@@ -353,13 +384,15 @@ class Typical(unittest.TestCase):
         # tools/logfiles.py is imported by every tool tools/entries.py is, and by tools/sync.py and
         # tools/config.py (which test_guide.py and test_upgrade.py load too), tools/resume.py and tools/chat_export.py
         # (which test_perplexity.py loads); test_chat_export.py loads entries.py itself, and
-        # maintainer/prepush.py imports deny_coverage.py, which imports both (#52)
+        # maintainer/prepush.py imports deny_coverage.py, which imports both, and test_upgrade.py runs
+        # docs/upgrades/upgrade-0.4.0.py, which loads entries.py (#52)
         both = ["tools/export-template.sh", "tools/tests/test_chat_export.py", "tools/tests/test_check_run.py",
                 "tools/tests/test_check_save.py", "tools/tests/test_deny_coverage.py", "tools/tests/test_logfiles.py",
                 "tools/tests/test_entries.py"]
         self.assertEqual(scripts(runs(["tools/entries.py"])), both + [
             "tools/tests/test_check.py", "tools/tests/test_scan.py",
-            "tools/tests/test_fit.py", "tools/tests/test_dashboard.py"]
+            "tools/tests/test_fit.py", "tools/tests/test_dashboard.py",
+            "tools/tests/test_upgrade.py"]   # through docs/upgrades/upgrade-0.4.0.py
             + (["maintainer/tests/test_prepush.py"] if SOURCE else []) + [
             "tools/tests/test_writing_lint.py", "tools/tests/test_application.py"])
         self.assertEqual(scripts(runs(["tools/logfiles.py"])), both + [
@@ -777,7 +810,7 @@ class EveryImport(unittest.TestCase):
         for g in checks_for.GROUPS:
             for c in g[3]:
                 if c[0] == "py" and checks_for.present(c, REPO):
-                    imported(c[1], REPO, untold, told={})
+                    imported(c[1], REPO, untold)
         self.assertEqual(sorted(set(untold)), sorted(UNTOLD))
 
     @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
@@ -805,7 +838,7 @@ class EveryImport(unittest.TestCase):
         told = dict(UNTOLD)
         del told[("tools/guide.py", 'os.path.join(root, "tools", name + ".py")')]
         untold = []
-        self.assertIn("tools/config.py", imported("tools/guide.py", REPO, untold))
+        self.assertIn("tools/config.py", imported("tools/guide.py", REPO))
         self.assertNotIn("tools/config.py", imported("tools/guide.py", REPO, untold, told))
         self.assertEqual(untold, [("tools/guide.py", 'os.path.join(root, "tools", name + ".py")')])
         group = [("lint", None, ["tools/guide.py", "tools/config.py", "tools/logfiles.py"],
@@ -865,6 +898,47 @@ class ReadsEveryImport(unittest.TestCase):
         self.assertEqual(sorted(loaded("tools/tests/test_x.py", self.root)), [
             "maintainer/tool.py", "tools/bymodule.py", "tools/bypath.py", "tools/dotted.py", "tools/dunder.py",
             "tools/fromed.py", "tools/helper.py", "tools/nested.py", "tools/plain.py", "tools/tests/near.py"])
+
+    def test_a_load_it_cannot_tell_is_untold(self):
+        # each a module the guard would miss if it read only the values it can tell
+        for name in ("a", "b", "c"):
+            self.write("tools/%s.py" % name)
+        self.write("tools/tests/test_x.py", "\n".join([
+            "import importlib.util, os",
+            "HERE = os.path.dirname(os.path.abspath(__file__))",
+            "TOOL = os.path.join(HERE, '..', 'a.py')",
+            "def load(name):",
+            "    return importlib.util.spec_from_file_location(name, os.path.join(HERE, '..', name + '.py'))",
+            "load('a')",
+            "for x in ['b']:",
+            "    load(x)",                       # a call whose argument is not told
+            "def twice():",
+            "    p = os.path.join(HERE, '..', 'a.py')",
+            "    importlib.util.spec_from_file_location('m', p)",
+            "    p = os.path.join(HERE, '..', 'b.py')",
+            "    importlib.util.spec_from_file_location('m', p)",   # p is bound twice: neither is told
+            "def shadow():",
+            "    TOOL = os.path.join(HERE, '..', 'c.py')",
+            "    importlib.util.spec_from_file_location('m', TOOL)",   # the local TOOL, not the module's
+            "def hide(TOOL):",
+            "    importlib.util.spec_from_file_location('m', TOOL)",   # a parameter hides the constant
+            ""]))
+        modules, untold = reads("tools/tests/test_x.py", self.root)
+        self.assertEqual(sorted(modules), ["tools/a.py", "tools/c.py"])
+        self.assertEqual(sorted(untold), sorted([
+            ("tools/tests/test_x.py", "os.path.join(HERE, '..', name + '.py')"),
+            ("tools/tests/test_x.py", "p"), ("tools/tests/test_x.py", "p"), ("tools/tests/test_x.py", "TOOL")]))
+
+    def test_a_folder_named_in_told_is_read(self):
+        self.write("tools/a.py")
+        self.write("docs/up/guide.py", "import a\n")
+        self.write("tools/tests/test_x.py", "import importlib.util, os\n"
+                   "def run(name):\n    importlib.util.spec_from_file_location('g', os.path.join('docs', 'up', name))\n")
+        load = ("tools/tests/test_x.py", "os.path.join('docs', 'up', name)")
+        untold = []
+        self.assertEqual(sorted(imported("tools/tests/test_x.py", self.root, untold, {load: ["docs/up/"]})),
+                         ["docs/up/", "docs/up/guide.py", "tools/a.py", "tools/tests/test_x.py"])
+        self.assertEqual(untold, [load])
 
     def test_through_other_modules_and_from_maintainer(self):
         # a maintainer tool puts tools/ on sys.path and imports a tool, which imports another

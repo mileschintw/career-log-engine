@@ -218,6 +218,7 @@ GROUPS = [
     ("upgrade", "upgrade-tests.yml", [
         "tools/upgrade.py", "tools/tests/test_upgrade.py", "tools/export-template.sh", "docs/upgrades/",
         "tools/config.py", "tools/logfiles.py", "tools/checks_for.py",   # test_upgrade.py loads checks_for.py
+        "tools/entries.py",   # and docs/upgrades/upgrade-0.4.0.py, which loads it
     ], [
         py("tools/tests/test_upgrade.py"),
     ]),
