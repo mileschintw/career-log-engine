@@ -8,7 +8,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 ## Handover
 
-- **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
+- **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
 - **Next（2026-11-23 22:55 -0800）：** 第三輪開工：e52、e17、e29。開 session、寫 Now 列、設鬧鐘；PR CI 過就 merge。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
@@ -30,6 +30,9 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
+| e52 | pr | #52 | local_524d3b89-26bb-4cc4-bfe1-b067c354ad7a（落在 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e52-366592`） | started | — |
+| e17 | pr | #17 #49 | local_f44ecadd-26c9-4624-9d40-d9039241d4b2（落在 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e17-18146b`） | started | — |
+| e29 | pr | #29 | local_d6d20f13-f7af-44ba-9fd5-33f16f3e68a0（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e29-8c9454`） | started | — |
 
 **Main checkout:** none.
 
