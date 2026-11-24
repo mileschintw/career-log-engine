@@ -53,7 +53,8 @@ none
 
 ## Waiting for the user's decision
 
-- **第一輪結束後（since 2026-11-23 16:49 -0800）：** 下一輪（建議 #46、#37 triage 後、#24）；Log 升到最新 Dev build 的 prompt；e27 提的「step 1 的 Dev build 警告要不要刪」要不要開 issue。
+- **第二輪提案（since 2026-11-23 17:18 -0800）：** e46（#46，triage 成 ready-for-agent）、e37（#37 triage，加一張新 issue：拿掉 step 1 的 Dev build 警告，e27 的建議，併進同一條 lane）、e24（#24）三條並行；問開工和 merge right。
+- **Log 升到最新 Dev build 的 prompt（since 2026-11-23 17:18 -0800）：** 要不要寫到私人記錄。
 
 ## Deadlines
 
