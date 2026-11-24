@@ -30,6 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
+| e28 | pr | #28 | local_18b5216e-470a-4017-aafa-15f4848e9bfd（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e28-194730`，基於 d216eb1） | started | — |
 
 **Main checkout:** none.
 
