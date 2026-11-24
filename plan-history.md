@@ -61,3 +61,10 @@ Now 列：
 使用者說「Archive them」：第一輪九個 lane session 已 archive（worktree 都乾淨、都已在 master）。
 
 使用者說「Delete them」：第一輪九條已 merge 的遠端分支已刪。
+
+## 第二輪 merge：e46（2026-11-23 17:45 -0800）
+
+PR #50（#46）template-checks 第一次偶發 fail（rmtree 撞 git maintenance.lock，#24 的問題），使用者 picked「重跑那個 job」，重跑通過後依第二輪 merge right merge；push run 在 8af5412e 成功。Now 列：
+
+| e46 | pr | #46 | local_f0e93011-09b8-4f6c-a556-9e3bb87b05f6（落在已 archive 的 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e46-0d3d17`） | PR #50: template-checks 偶發 fail（rmtree 撞 git maintenance.lock，#24），使用者 picked「重跑那個 job」，重跑中 | — |
+
