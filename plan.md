@@ -30,8 +30,8 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e46 | pr | #46 | local_f0e93011-09b8-4f6c-a556-9e3bb87b05f6（落在已 archive 的 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e46-0d3d17`） | PR #50 open, waitchecks | — |
-| e37 | pr | #37 #48 | local_ce3c81e2-c1be-48fb-b734-b260e75431a1（落在已 archive 的 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e37-be3720`） | done, 等使用者決定（#48 第三條 Sonnet 0.4.0 仍說兩次，#49） | — |
+| e46 | pr | #46 | local_f0e93011-09b8-4f6c-a556-9e3bb87b05f6（落在已 archive 的 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e46-0d3d17`） | PR #50: template-checks 偶發 fail（rmtree 撞 git maintenance.lock，#24），使用者 picked「重跑那個 job」，重跑中 | — |
+| e37 | pr | #37 #48 | local_ce3c81e2-c1be-48fb-b734-b260e75431a1（落在已 archive 的 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e37-be3720`） | PR #51 open, waitchecks | — |
 | e24 | pr | #24 | local_fb3ec7ec-9018-4991-91b5-6622fdb72507（落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e24-48edc9`） | started | — |
 
 **Main checkout:** none.
@@ -60,7 +60,7 @@ none
 
 - **第二輪（2026-11-23 17:22 -0800）：** 使用者說開工。#37、#46 triage 成 ready-for-agent，開了 #48（step 1 的 Dev build 警告，併進 e37）。
 - **Log 升到最新 Dev build 的 prompt（since 2026-11-23 17:18 -0800）：** 要不要寫到私人記錄。
-- **e37 的 PR（since 2026-11-23）：** #37 十個 run 全過；#48 第三條（警告只說一次）Sonnet 在 0.4.0 Log 上仍在 step 5 摘要再說一次，記在 #49。問：照現在開 PR、CI 過 merge（Closes #37 #48，剩的留 #49），或先做第二輪 fix。
+- **e37（2026-11-23）：** 使用者 picked「開 PR，剩的留 #49」，PR #51。
 
 ## Deadlines
 
