@@ -55,11 +55,11 @@ Tell the user, in one message: the versions from and to, each step, and what hap
 - `dropped:` files are Engine files the new release no longer has: a step deletes them (an edited one shows again in step 4).
 - The Log's own `.gitignore` lines are put back after each step, with no question.
 
-When `to:` is a Dev build (`<version>-dev.<n>`), the same message also says that no Dev build is promised stable and that the newest release stays the default, once per upgrade: when you already told the user so in this upgrade (a Log's own, older step 1 may say it), this message leaves it out.
+When `to:` is a Dev build (`<version>-dev.<n>`), the same message also says that no Dev build is promised stable and that the newest release stays the default. The user hears this once in the upgrade: here, or in a message you already sent them in this upgrade (a 0.4.1 Log's own step 1 says it). Every later message, step 5's summary included, covers what the upgrade did and leaves the warning out.
 
-End your turn on that question, and wait for the user's reply to it.
+End your turn on the plan's question. The user's request came before the plan, so it is no yes to it, even when it names the target or says they know a Dev build is not promised stable.
 
-Done when the user has replied yes to the plan message, or the mode has ended at `OK:` or a `stop:` the user chose not to settle now. Their request came before the plan, so it is no yes to it, even when it names the target or says they know a Dev build is not promised stable.
+Done when the user has replied yes to the plan message, or the mode has ended at `OK:` or a `stop:` the user chose not to settle now.
 
 ## 3. One release at a time
 
