@@ -229,6 +229,30 @@ class TestCopy(Base):
         self.assertEqual(rc, 1)
         self.assertIn("not empty", err)
 
+    def test_refuses_a_branch_that_holds_log_data(self):
+        """#29: copy never takes a real record; a case that reads the Log takes template-copy and fixtures."""
+        for path in ("profile.md", "entries/2026-01-01-x.md", "outputs/x.md", "entries/2026-01-02-甲 乙.md"):
+            with self.subTest(path=path):
+                write(os.path.join(self.wt, path), "x\n")
+                git(self.wt, "add", path)
+                git(self.wt, "commit", "-qm", "data")
+                rc, _, err = self.copy()
+                self.assertEqual(rc, 1)
+                self.assertIn(path, err)
+                self.assertIn("Build one scratch copy", err)
+                self.assertFalse(os.path.exists(self.t))
+                git(self.wt, "rm", "-q", path)
+                git(self.wt, "commit", "-qm", "no data")
+
+    def test_takes_the_engine_repos_own_files(self):
+        """entries/_template.md, the front pages and config.toml (Base commits one) are no Log data."""
+        for path in ("entries/_template.md", "README.md", "README.zh-TW.md"):
+            write(os.path.join(self.wt, path), "x\n")
+        git(self.wt, "add", "-A")
+        git(self.wt, "commit", "-qm", "engine files")
+        rc, out, err = self.copy()
+        self.assertEqual(rc, 0, out + err)
+
 
 class TestReset(Base):
     def test_reset_cleans_the_last_run_and_takes_the_new_head(self):
@@ -274,6 +298,17 @@ class TestReset(Base):
         rc, _, err = run("reset", self.t)
         self.assertEqual(rc, 1)
         self.assertIn("refusing", err)
+
+    def test_refuses_a_branch_that_now_holds_log_data(self):
+        self.assertEqual(self.copy()[0], 0)
+        head = git(self.log, "rev-parse", "HEAD")
+        write(os.path.join(self.wt, "direction.md"), "x\n")
+        git(self.wt, "add", "direction.md")
+        git(self.wt, "commit", "-qm", "data")
+        rc, _, err = run("reset", self.t)
+        self.assertEqual(rc, 1)
+        self.assertIn("direction.md", err)
+        self.assertEqual(git(os.path.join(self.t, "remote.git"), "rev-parse", "master"), head)
 
 
 @unittest.skipUnless(shutil.which("bash"), "bash not on PATH")

@@ -133,7 +133,7 @@ For each run this section covers, the report gives the maintainer's approval in 
 
 Every agent case (a clean-agent run in a round, or any case a session hands to a fresh agent) keeps off the maintainer's real profile (the maintainer, 2026-10-24). A case once ran setup against it: its scratch Log had no `config.toml`, the agent read the *Trigger check* as "run setup", rewrote the real `~/.career-log/machine.toml` and ran `tlmgr` on the real TinyTeX.
 
-`maintainer/harness.py` (*Harness*) applies these rules: its copies give the agent a scratch `config.toml` and home, its `prompt` keeps the agent's commands in that home, and its `start` and `collect` hash the real `~/.career-log/machine.toml` (`harness.py --help` says how). Start every agent case through it, a case outside a round too (`start --round 0`, with its own `<runs>` file): build its Log with `copy` or `template-copy`, run `start`, and give the agent what `prompt` prints. A prompt of your own holds, word for word, the three lines of `prompt`'s output that begin `- Never run setup`, `- Start every shell command` and `- Copy the two lines above`, in that order and next to each other.
+`maintainer/harness.py` (*Harness*) applies these rules: its copies give the agent a scratch `config.toml` and home, its `prompt` keeps the agent's commands in that home, and its `start` and `collect` hash the real `~/.career-log/machine.toml` (`harness.py --help` says how). Start every agent case through it, a case outside a round too (`start --round 0`, with its own `<runs>` file): build its copy (*Build one scratch copy per concurrent run*), run `start`, and give the agent what `prompt` prints. A prompt of your own holds, word for word, the three lines of `prompt`'s output that begin `- Never run setup`, `- Start every shell command` and `- Copy the two lines above`, in that order and next to each other.
 
 In that home the agent finds no machine setup and no `gh` login: copy the real `~/.career-log/machine.toml` into `<t>/home/.career-log/` when the case needs this machine's tools (a write then lands on the copy), and expect a `gh` read to fail when the case gives no token.
 
@@ -149,17 +149,21 @@ Done when: before each agent starts, `start` printed no FAIL line and the prompt
 
 ### Build one scratch copy per concurrent run
 
-The copy is this repo as the branch has it: the Engine under test and the maintainer's own committed Log (ignored files such as `sources/inbox/` stay behind), so runs work on real entries. Saves commit, so each concurrent run gets its own copy. It has the head under test as its default branch, with no Engine branch: the skill commits every data save to its default branch ([SKILL.md › Commits](../skills/career-log/SKILL.md)), a bulk one after the user's yes (*Collect a run* step 2), so the save starts from the text under test and lands where *Collect a run* grades it.
+This repo holds no Log ([ADR 0015](adr/0015-the-engine-is-developed-in-its-own-public-repo.md)), so a case that reads entries, profile or direction runs on a Template copy (*A Template copy*) with fixtures: the files the expected sheet lists for the case, written for it and made up (names, employers, dates and numbers), in the formats of the head under test (`entries/_template.md`, the skeleton's `profile.md` and `direction.md`). No fixture comes from a real Log, the maintainer's included, and none is kept in this repo: each case writes its own, so a format change never leaves a stale set behind.
 
-Commit the branch, then run `harness.py copy <t>`.
+A case that runs in this repo itself (an Engine change made by the agent under [engine-changes.md](../skills/career-log/engine-changes.md), or the no-Log rule of `AGENTS.md`) takes `harness.py copy <t>` instead: this repo as the branch has it, the Engine and the maintainer's files, with no Log data (`copy` refuses a branch that holds any).
 
-Done when: it printed no FAIL line.
+Saves commit, so each concurrent run gets its own copy. Either kind has the head under test on its default branch, with no Engine branch: the skill commits every data save to its default branch ([SKILL.md › Commits](../skills/career-log/SKILL.md)), a bulk one after the user's yes (*Collect a run* step 2), so the save starts from the text under test and lands where *Collect a run* grades it.
+
+Commit the branch, then run `harness.py template-copy <t>` (*A Template copy*) or `harness.py copy <t>`.
+
+Done when: it printed no FAIL line, and a Template copy's `<t>/log` holds every fixture the expected sheet lists for its case.
 
 ### A Template copy
 
-A behaviour that only a new Log reaches (the Template's skeleton, a Log with no history) needs a copy made from the export: commit the branch, then run `harness.py template-copy <t>`. When the expected sheet lists edits for the test case, add `--no-seed`, make them in `<t>/log`, then run `harness.py seed <t>`. Add `--no-config` only for a case that must start with no `config.toml` (*The real profile*'s exception); a setup *Changes* case for a Config or Direction field needs it.
+`harness.py template-copy <t>` makes a copy from the export of the committed branch: a new Log with no history. When the expected sheet lists fixtures or edits for the test case, add `--no-seed`, write them in `<t>/log`, then run `harness.py seed <t>`. Add `--no-config` only for a case that must start with no `config.toml` (*The real profile*'s exception); a setup *Changes* case for a Config or Direction field needs it.
 
-Done when: it printed no FAIL line. To reset it, run `harness.py remove <t>` and build it again.
+Done when: it printed no FAIL line, after `seed` when you gave `--no-seed`. To reset it, run `harness.py remove <t>` and build it again.
 
 ### Reset a copy before each run
 
@@ -173,8 +177,9 @@ Before the round's first run:
 1. Read the steps under test and the Log files your test cases touch.
 2. Pick test cases (a user message, plus any posting it needs, from live postings) that exercise each branch the change touches. For `write`: at least one posting that needs the browser, one with sponsorship language, and one that stops at an apply flow.
 3. Write a pass line for each check, and for each test case the value the run must reach (which entry is course work, which part an agent wrote, whether the posting has a sponsorship line).
+4. For each test case that reads the Log, list its fixtures: each file and its made-up content (*Build one scratch copy per concurrent run*).
 
-Done when: every branch the change touches has a test case, every check has a pass line, and every test case has an expected value.
+Done when: every branch the change touches has a test case, every check has a pass line, every test case has an expected value, and every test case that reads the Log has its fixtures listed.
 
 ### Start a clean agent
 
