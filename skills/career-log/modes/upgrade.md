@@ -23,13 +23,15 @@ Placeholders: `<root>` is the Log's root, `<py>` is `python3` (`py -3` on Window
    git -C <root> fetch --no-tags https://github.com/mileschintw/career-log-engine.git "+refs/tags/v*:refs/career-log-upgrade/engine/v*"
    ```
    The ref is then `refs/career-log-upgrade/engine/v<that version>`. When `<url>` is not the default, it holds every tag: list and fetch from `<url>` instead, and the ref is `refs/career-log-upgrade/v<that version>`. A **local Dev build** (the user names a Dev build and a folder on this machine, a build of a change not yet merged) is such a `<url>`: the folder's path, which holds the release tags too.
+
+   **A Log on a later Dev build:** when the user named no version and the Log's version (the first line of `tools/TEMPLATE_VERSION`) is a Dev build `<x>-dev.<n>` whose `<x>` is after the newest release under `refs/career-log-upgrade/` (a ref with no `-dev.`; `0.4.2-dev.1`, the newest release `0.4.1`), the Log is ahead of every release: the target is the Log's own version and the ref is `HEAD`, so item 3 takes the Log's own tool and this file, and step 2's `plan` answers `OK:`.
 3. Take the target's tool and this mode's file as the target has them, into `<root>/.build/upgrade/` (`.gitignore` leaves `.build/` out); this writes those two files there and leaves the Log's index and working tree as they are:
    ```
    mkdir -p <root>/.build/upgrade
    git -C <root> --work-tree=<root>/.build/upgrade restore --source=<ref> --worktree -- tools/upgrade.py skills/career-log/modes/upgrade.md
    ```
    In Windows PowerShell, the first line is `New-Item -ItemType Directory -Force <root>/.build/upgrade | Out-Null`.
-4. Read `<root>/.build/upgrade/skills/career-log/modes/upgrade.md`. When its text differs from this file's, it is the newer mode: follow it from its step 2, in place of this file.
+4. Read `<root>/.build/upgrade/skills/career-log/modes/upgrade.md`. When its text differs from this file's, it is the target's mode: follow it from its step 2, in place of this file.
 
 Done when `<tool>` exists and you are following the target's text of this mode.
 
@@ -90,7 +92,7 @@ Done when every edited file has the user's answer, `git -C <root> grep -n "^<<<<
 
 ## 5. The user's yes
 
-Show the user `git -C <root> log --oneline <start>..HEAD`, `git -C <root> diff --stat <start>..HEAD` and a short summary per step, and ask them to read the full diff in their editor. Then:
+Show the user `git -C <root> log --oneline <start>..HEAD`, `git -C <root> diff --stat <start>..HEAD` and a short summary of what each step changed in the Log: per `step:`, its Engine files, the front-page text step 3 item 1 names and what its guide changed; then the Engine edits step 4 merged or kept. That is the whole summary: the plan message already told the user the rest. Ask them to read the full diff in their editor. Then:
 - **Yes:** `git -C <root> push`.
 - **A change:** make it, commit it as `upgrade: <what changed>`, and show the log and stat again.
 - **Undo the whole upgrade:** on their explicit yes to dropping every commit since `start:`, `git -C <root> reset --hard <start>`; nothing else is lost, since the tree was clean at `start:`.

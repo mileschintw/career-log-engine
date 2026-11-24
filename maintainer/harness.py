@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The test harness of docs/maintaining-tests.md and the copy steps of docs/migrating.md: scratch
-copies of the Log for clean-agent runs, the run's prompt, its row and grade, the round's table, and
-the records folder's snapshots. Run a subcommand, then follow what it prints.
+copies for clean-agent runs (a new Log from the export, or this repo's Engine), the run's prompt,
+its row and grade, the round's table, and the records folder's snapshots. Run a subcommand, then
+follow what it prints.
 
   python3 -I maintainer/harness.py copy <t> [--worktree <w>] [--branch <b>] [--default <d>]
   python3 -I maintainer/harness.py template-copy <t> [--worktree <w>] [--default <d>] [--from <dir>
@@ -41,9 +42,13 @@ and remove refuse a folder without it.
 copy           builds a copy of <b> as it is committed in <w> (an uncommitted change in a tracked
                file is refused: the fetch takes commits only), with <b> as <t>/log's default
                branch <d>, its origin the bare repo <t>/remote.git, identity Test
-               <test@example.invalid>. When the Log's update_check is not off, a commit
-               `test: update_check off` on top of the head under test turns it off and is pushed;
-               it changes no Engine file. Then runs verify. <t> must be empty or missing.
+               <test@example.invalid>. It carries no Log data: this repo holds no Log, so the copy
+               is the Engine and the maintainer's files, for a case that runs in this repo itself;
+               a case that reads entries, profile or direction takes template-copy and fixtures.
+               A <b> that holds Log data is refused; reset refuses it too. When update_check is not
+               off, a commit `test: update_check off` on top of the head under test turns it off
+               and is pushed; it changes no Engine file. Then runs verify. <t> must be empty or
+               missing.
 template-copy  builds a copy from `tools/export-template.sh` of <w>'s committed head: a new Log
                with no history, its seed commit with the head's executable bits, as "Use this
                template" gives them (a copy on Windows has no executable bit to stage). --from
@@ -355,9 +360,25 @@ def update_check_off(t, default):
 
 # ---- copy, template-copy, seed, reset, verify ----
 
+# Log paths (logfiles.is_log_path) an Engine repo may hold too: its front pages, and the config.toml
+# copy itself writes.
+NOT_DATA = ("README.md", "README.zh-TW.md", "config.toml")
+
+
+def no_log_data(worktree, branch):
+    """Refuse a <branch> that holds Log data (#29: this repo holds none, and a copy takes none)."""
+    paths = out(worktree, "ls-tree", "-r", "-z", "--name-only", "--full-tree", branch).split("\0")
+    data = [p for p in paths if p and logfiles.is_log_path(p) and p not in NOT_DATA]
+    if data:
+        raise Fail("%s holds Log data (%s%s): copy takes the Engine only (docs/maintaining-tests.md › "
+                   "Build one scratch copy per concurrent run)"
+                   % (branch, ", ".join(data[:5]), ", ..." if len(data) > 5 else ""))
+
+
 def cmd_copy(a):
     worktree, branch, default = resolve(a)
     committed(worktree)
+    no_log_data(worktree, branch)
     t = os.path.abspath(a.t)
     empty_target(t)
     remote, log = os.path.join(t, "remote.git"), os.path.join(t, "log")
@@ -493,6 +514,7 @@ def cmd_reset(a):
         raise Fail("a Template copy is not reset: harness.py remove %s, then template-copy again" % t)
     log, remote, default = os.path.join(t, "log"), os.path.join(t, "remote.git"), meta["default"]
     committed(meta["worktree"])
+    no_log_data(meta["worktree"], meta["branch"])
     git(remote, "fetch", "-q", meta["worktree"], "+%s:%s" % (meta["branch"], default))
     worktrees = [line[len("worktree "):] for line in out(log, "worktree", "list", "--porcelain").splitlines()
                  if line.startswith("worktree ")]
