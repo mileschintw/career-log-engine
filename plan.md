@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-24 00:37 -0800）：** 第三輪三條 lane 全部 merge（#54、#55、#56），最新 Dev build v0.4.2-dev.17。沒有 lane、沒有鬧鐘。等使用者：archive 第三輪三個 session 和刪分支、#28、Log 升級 prompt。
+- **Next（2026-11-24 00:44 -0800）：** 第三輪結束，session 已 archive、分支已刪。沒有 lane、沒有鬧鐘。等使用者：#28、Log 升級 prompt。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -48,7 +48,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第三輪結束後（since 2026-11-24 00:37 -0800）：** archive e52、e17、e29 的 session 並刪它們的遠端分支；#28（四個選項選哪些，建議先 1、3）；Log 升到最新 Dev build（v0.4.2-dev.17）的 prompt（寫到私人記錄）。
+- **第三輪結束後（since 2026-11-24 00:37 -0800）：** #28（四個選項選哪些，建議先 1、3）；Log 升到最新 Dev build（v0.4.2-dev.17）的 prompt（寫到私人記錄）。
 
 ## Deadlines
 
