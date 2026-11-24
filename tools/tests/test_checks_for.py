@@ -13,10 +13,10 @@ other than `paths:` under `pull_request:`.
 
 EveryImport (#52) reads each py check's imports with ast, through every repo module they reach:
 import statements anywhere in a file (resolved beside it, then in tools/), and modules loaded by
-path or name (spec_from_file_location, import_module, __import__) whose argument it can tell. It
-fails on a module no group running the check has among its triggers (LEFT_OUT lists the rightful
-exceptions), or that their workflows' paths: lack. Standard and third-party modules, a script run
-as a subprocess, and a file loaded from a path it cannot tell (a scratch Log's copy) are left out.
+path or name (spec_from_file_location, import_module, __import__). It fails on a module no group
+running the check has among its triggers (LEFT_OUT lists the rightful exceptions), or that their
+workflows' paths: lack, and on a load whose path or name it cannot tell, unless UNTOLD names what
+that load loads. Standard and third-party modules and a script run as a subprocess are left out.
 """
 import ast, contextlib, importlib.util, io, os, re, shutil, subprocess, sys, tempfile, time, unittest
 
@@ -172,35 +172,49 @@ def value(node, env, path):
 
 
 def loaded(rel, root=REPO):
-    """The repo modules the Python file rel (repo-relative) loads itself, as repo-relative paths:
+    """reads()'s modules alone."""
+    return reads(rel, root)[0]
+
+
+def reads(rel, root=REPO):
+    """(modules, untold): the repo modules the Python file rel (repo-relative) loads itself, as repo-relative paths:
     those its import statements name (anywhere in the file), resolved in its own folder, then in
     tools/, where every file that imports a tool puts it on sys.path; and those it loads by path or
     by name: importlib.util.spec_from_file_location, importlib.import_module and __import__, whose
     argument value() can tell, a helper's parameter taking each constant its calls in the file pass.
-    Anything else, a standard or third-party module included, is not a repo module and is left out."""
+    Anything else, a standard or third-party module included, is not a repo module and is left out.
+    untold: (rel, the argument's source) for each load by path or name whose argument value()
+    cannot tell with any of those constants: a module the guard may miss, unless UNTOLD names it."""
     path = os.path.join(root, rel)
     with open(path, encoding="utf-8") as f:
-        tree = ast.parse(f.read(), rel)
-    env = {}
-    for stmt in tree.body:   # the module's constants: HERE, TOOLS, TOOL and the like
-        if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-            got = value(stmt.value, env, path)
-            if got is not None:
-                env.setdefault(stmt.targets[0].id, got)
-    calls = {}   # a function's name: the constant positional arguments of each call to it
+        source = f.read()
+    tree = ast.parse(source, rel)
+    def assigned(stmts, env):
+        """env with the names stmts assign a value() it can tell (the first such assignment)."""
+        env = dict(env)
+        for stmt in stmts:
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+                got = value(stmt.value, env, path)
+                if got is not None:
+                    env.setdefault(stmt.targets[0].id, got)
+        return env
+    env = assigned(tree.body, {})   # the module's constants: HERE, TOOLS, TOOL and the like
+    calls = {}   # a function's name: the positional arguments value() tells of each call to it
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, (ast.Name, ast.Attribute)):
             name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr
-            calls.setdefault(name, []).append([value(a, {}, path) for a in node.args])
-    paths, names = set(), set()
+            calls.setdefault(name, []).append([value(a, env, path) for a in node.args])
+    paths, names, untold = set(), set(), []
     for scope in [tree] + [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+        nested = [n for n in ast.walk(scope) if n is not scope and isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        inner = {id(m) for n in nested for m in ast.walk(n)}
         envs = [env]
-        if scope is not tree:   # each call's constants for the parameters
+        if scope is not tree:   # its own assignments, and each call's constants for the parameters
             params = [a.arg for a in scope.args.posonlyargs + scope.args.args]
             envs += [dict(env, **{p: a for p, a in zip(params, args) if a is not None})
                      for args in calls.get(scope.name, [])]
-        nested = [n for n in ast.walk(scope) if n is not scope and isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-        inner = {id(m) for n in nested for m in ast.walk(n)}
+            local = [n for n in ast.walk(scope) if isinstance(n, ast.Assign) and id(n) not in inner]
+            envs = [assigned(local, e) for e in envs]
         for node in ast.walk(scope):
             if id(node) in inner:   # read with the function it is in
                 continue
@@ -211,9 +225,15 @@ def loaded(rel, root=REPO):
             elif isinstance(node, ast.Call) and node.args:
                 fn = dotted(node.func) or ""
                 if fn.endswith("spec_from_file_location") and len(node.args) > 1:
-                    paths.update(value(node.args[1], e, path) for e in envs)
+                    arg, into = node.args[1], paths
                 elif fn == "__import__" or fn.endswith("import_module"):
-                    names.update(value(node.args[0], e, path) for e in envs)
+                    arg, into = node.args[0], names
+                else:
+                    continue
+                got = {value(arg, e, path) for e in envs} - {None}
+                into.update(got)
+                if not got:
+                    untold.append((rel, ast.get_source_segment(source, arg)))
     out = set()
     for p in paths - {None}:
         p = os.path.relpath(os.path.normpath(os.path.join(os.path.dirname(path), p)), root).replace("\\", "/")
@@ -226,17 +246,42 @@ def loaded(rel, root=REPO):
                 out.add(p)
                 break
     out.discard(rel)
-    return out
+    return out, untold
 
 
-def imported(rel, root=REPO):
-    """rel and every repo module it loads, directly or through other repo modules (loaded())."""
+# (file, argument): a load by path or name whose argument the guard cannot tell (reads()), and the
+# repo paths it loads, which the guard takes as imported (a folder ends in /). A load not listed
+# fails EveryImport; a listed one that is gone fails test_the_lists_hold_only_what_is_there.
+UNTOLD = {
+    # module(root, name): the Log's own tools/<name>.py, a test's scratch root's in a test; the calls
+    # pass "config"
+    ("tools/guide.py", 'os.path.join(root, "tools", name + ".py")'): ["tools/config.py"],
+    # the upgrade guide that holds #695's check, whichever release's it is
+    ("tools/tests/test_upgrade.py", 'os.path.join(REPO, "docs", "upgrades", name)'): ["docs/upgrades/"],
+    # a scratch Log's copy of tools/config.py, which the test wrote: not this repo's file
+    ("tools/tests/test_upgrade.py", 'os.path.join(log, "tools", "config.py")'): [],
+}
+
+
+def imported(rel, root=REPO, untold=None, told=UNTOLD):
+    """rel and every repo module it loads, directly or through other repo modules (reads()), and
+    the paths told names for an untold load; each untold load told does not name is appended to
+    untold when given."""
     seen, todo = set(), [rel]
     while todo:
         p = todo.pop()
-        if p not in seen:
-            seen.add(p)
-            todo += loaded(p, root)
+        if p in seen:
+            continue
+        seen.add(p)
+        if not p.endswith(".py"):   # a folder told names
+            continue
+        modules, unknown = reads(p, root)
+        todo += modules
+        for load in unknown:
+            if load in told:
+                todo += told[load]
+            elif untold is not None:
+                untold.append(load)
     return seen
 
 
@@ -251,11 +296,12 @@ LEFT_OUT = {
 }
 
 
-def import_gaps(groups, root=REPO, workflows=None, left_out=LEFT_OUT):
+def import_gaps(groups, root=REPO, workflows=None, left_out=LEFT_OUT, told=UNTOLD):
     """#52: each module a py check imports (imported()) that a change to would not run it: one no
     group running that check has among its triggers (GROUPS), unless left_out lists it, or, given
-    workflows ({name: text}), none of those groups' workflows has in its paths:. A check whose script
-    is not in root (maintainer/ in a Template) is left out. [] when every module is covered."""
+    workflows ({name: text}), none of those groups' workflows has in its paths:; and each load whose
+    module the guard cannot tell, unless told (UNTOLD) names it. A check whose script is not in root
+    (maintainer/ in a Template) is left out. [] when every module is covered."""
     runners = {}
     for g in groups:
         for c in g[3]:
@@ -267,7 +313,12 @@ def import_gaps(groups, root=REPO, workflows=None, left_out=LEFT_OUT):
         triggers = [t for g in gs for t in checks_for.triggers(g, root)]
         flows = sorted({g[1] for g in gs if g[1] and workflows and g[1] in workflows})
         paths = [p[:-2] if p.endswith("/**") else p for f in flows for p in workflow_paths(workflows[f])[0] or []]
-        for module in sorted(imported(script, root)):
+        untold = []
+        found = imported(script, root, untold, told)
+        problems += ["%s loads a module from %s's %s, which the guard cannot tell: make it a constant or "
+                     "os.path.join of the file's constants, or list it in UNTOLD with what it loads"
+                     % (script, f, arg) for f, arg in sorted(set(untold))]
+        for module in sorted(found):
             if (script, module) not in left_out and not any(checks_for.matches(module, t) for t in triggers):
                 problems.append("%s imports %s: no group that runs it (%s) has it in tools/checks_for.py GROUPS"
                                 % (script, module, names))
@@ -654,11 +705,9 @@ class Parity(unittest.TestCase):
             if g[1]:
                 groups.setdefault(g[1], []).append(g)
         problems = []
-        for name in sorted(os.listdir(WORKFLOWS)):
-            if not name.endswith(".yml") or name in NO_PATHS:
+        for name, text in sorted(read_workflows().items()):
+            if name in NO_PATHS:
                 continue
-            with open(os.path.join(WORKFLOWS, name), encoding="utf-8") as f:
-                text = f.read()
             if name not in groups:
                 problems.append("%s: no group in tools/checks_for.py GROUPS" % name)
                 continue
@@ -717,11 +766,19 @@ class EveryImport(unittest.TestCase):
         self.assertEqual(import_gaps(checks_for.GROUPS, REPO, read_workflows()), [])
 
     @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
-    def test_the_list_holds_only_gaps(self):
+    def test_the_lists_hold_only_what_is_there(self):
         # each LEFT_OUT entry is still imported and still missing from its groups' triggers
-        self.assertEqual(sorted(import_gaps(checks_for.GROUPS, left_out={})),
-                         sorted("%s imports %s: no group that runs it (template checks) has it in tools/checks_for.py "
-                                "GROUPS" % k for k in LEFT_OUT))
+        gaps = import_gaps(checks_for.GROUPS, left_out={})
+        self.assertEqual(len(gaps), len(LEFT_OUT), gaps)
+        for script, module in LEFT_OUT:
+            self.assertTrue(any(g.startswith("%s imports %s: no group" % (script, module)) for g in gaps), (script, module))
+        # each UNTOLD load is still in a file some check imports, and still one the guard cannot tell
+        untold = []
+        for g in checks_for.GROUPS:
+            for c in g[3]:
+                if c[0] == "py" and checks_for.present(c, REPO):
+                    imported(c[1], REPO, untold, told={})
+        self.assertEqual(sorted(set(untold)), sorted(UNTOLD))
 
     @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
     def test_a_planted_gap_fails(self):
@@ -737,9 +794,27 @@ class EveryImport(unittest.TestCase):
                       import_gaps(checks_for.GROUPS, REPO, flows))
 
     def test_a_group_that_runs_it_is_enough(self):
-        # test_check.py runs in three groups; the machine check group's triggers cover what it imports
-        self.assertIn("tools/upgrade.py", imported("tools/tests/test_check.py"))
-        self.assertNotIn("tools/upgrade.py", [t for g in checks_for.GROUPS if g[0] == "config" for t in g[2]])
+        # test_check.py runs in three groups (config, machine check, speech): the config group alone
+        # lacks tools/upgrade.py, which it imports, and the three together cover all it imports
+        groups = [g for g in checks_for.GROUPS if g[0] in ("config", "machine check", "speech")]
+        self.assertIn("tools/tests/test_check.py imports tools/upgrade.py: no group that runs it (config) has it "
+                      "in tools/checks_for.py GROUPS", import_gaps(groups[:1]))
+        self.assertFalse([p for p in import_gaps(groups) if p.startswith("tools/tests/test_check.py ")])
+
+    def test_an_untold_load_fails(self):
+        told = dict(UNTOLD)
+        del told[("tools/guide.py", 'os.path.join(root, "tools", name + ".py")')]
+        untold = []
+        self.assertIn("tools/config.py", imported("tools/guide.py", REPO, untold))
+        self.assertNotIn("tools/config.py", imported("tools/guide.py", REPO, untold, told))
+        self.assertEqual(untold, [("tools/guide.py", 'os.path.join(root, "tools", name + ".py")')])
+        group = [("lint", None, ["tools/guide.py", "tools/config.py", "tools/logfiles.py"],
+                  [checks_for.py("tools/guide.py")])]
+        self.assertEqual(import_gaps(group), [])
+        self.assertEqual(import_gaps(group, told=told), [
+            "tools/guide.py loads a module from tools/guide.py's os.path.join(root, \"tools\", name + \".py\"), which "
+            "the guard cannot tell: make it a constant or os.path.join of the file's constants, or list it in "
+            "UNTOLD with what it loads"])
 
 
 class ReadsEveryImport(unittest.TestCase):
@@ -784,6 +859,8 @@ class ReadsEveryImport(unittest.TestCase):
             "spec = importlib.util.spec_from_file_location('unknown', os.path.join(somewhere(), 'x.py'))",
             ""]))
         self.write("tools/tests/near.py")
+        self.assertEqual(reads("tools/tests/test_x.py", self.root)[1],
+                         [("tools/tests/test_x.py", "os.path.join(somewhere(), 'x.py')")])
         # json, importlib, collections: not repo modules; nothing.py: no such file; somewhere(): not told
         self.assertEqual(sorted(loaded("tools/tests/test_x.py", self.root)), [
             "maintainer/tool.py", "tools/bymodule.py", "tools/bypath.py", "tools/dotted.py", "tools/dunder.py",
