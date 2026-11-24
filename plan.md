@@ -31,7 +31,6 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
 | e52 | pr | #52 | local_524d3b89-26bb-4cc4-bfe1-b067c354ad7a（落在 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e52-366592`） | review（worker 跑第二輪 review 和 checks_for --run） | — |
-| e17 | pr | #17 #49 | local_f44ecadd-26c9-4624-9d40-d9039241d4b2（落在 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e17-18146b`） | PR #54 open, waitchecks | — |
 | e29 | pr | #29 | local_d6d20f13-f7af-44ba-9fd5-33f16f3e68a0（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e29-8c9454`） | PR #55 open, waitchecks | — |
 
 **Main checkout:** none.
@@ -42,11 +41,9 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
-| #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 1`（item 4） | 第三輪 lane e17 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：要使用者在 Direction 的四個選項裡選（建議先 1、3，2、4 等量過成本） |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | 1 | none | none | `maintainer/harness.py › copy`、`docs/maintaining-tests.md › Harness` | 第三輪 lane e29 |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #49 升級模式：Sonnet 在 step 5 摘要重複 Dev build 警告 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 5` | 第三輪 lane e17 |
 | #52 maintainer 工具 import `tools/logfiles.py`，但 coord／dev build／prepush 群組和 `coord-tests.yml` 沒列 | 1 | none | none | `tools/checks_for.py › GROUPS`、`coord-tests.yml › paths:`、`tools/tests/test_checks_for.py` | 第三輪 lane e52 |
 
 ## Waiting for the user to be present

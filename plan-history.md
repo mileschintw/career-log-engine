@@ -87,3 +87,11 @@ Now 列：
 2026-11-23 21:22 -0800 使用者說「Archive 並刪分支」：第二輪三個 lane session（e46、e37、e24）已 archive（worktree 乾淨、都已在 master），三條遠端分支 `claude/lane-e46-0d3d17`、`claude/lane-e37-be3720`、`claude/lane-e24-48edc9` 已刪。
 
 - **第三輪（2026-11-23 22:55 -0800）：** 使用者說開工。#17、#29、#49、#52 triage 成 ready-for-agent；#52 加了 guard 的 acceptance，#29 記下使用者選的 template-copy＋fixture，#17、#29 補了 Files 節。
+
+## e17 merged（2026-11-24 07:17Z）
+
+PR #54 merged，關閉 #17、#49；master push run 在 46ed16aa 通過（Dev build）。報告 `reports/e17.md`。Now 列：
+
+| e17 | pr | #17 #49 | local_f44ecadd-26c9-4624-9d40-d9039241d4b2（落在 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e17-18146b`） | PR #54 open, waitchecks | — |
+| #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 1`（item 4） | 第三輪 lane e17 |
+| #49 升級模式：Sonnet 在 step 5 摘要重複 Dev build 警告 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 5` | 第三輪 lane e17 |
