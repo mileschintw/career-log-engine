@@ -68,3 +68,9 @@ PR #50（#46）template-checks 第一次偶發 fail（rmtree 撞 git maintenance
 
 | e46 | pr | #46 | local_f0e93011-09b8-4f6c-a556-9e3bb87b05f6（落在已 archive 的 `.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/lane-e46-0d3d17`） | PR #50: template-checks 偶發 fail（rmtree 撞 git maintenance.lock，#24），使用者 picked「重跑那個 job」，重跑中 | — |
 
+## 第二輪 merge：e37（2026-11-23 17:46 -0800）
+
+PR #51（#37、#48）：使用者 picked「開 PR，剩的留 #49」；template-checks 同樣偶發 fail，重跑通過後 merge。#48 第三條 Sonnet 0.4.0 的重複留在 #49。Now 列：
+
+| e37 | pr | #37 #48 | local_ce3c81e2-c1be-48fb-b734-b260e75431a1（落在已 archive 的 `.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/lane-e37-be3720`） | PR #51 open, waitchecks | — |
+
