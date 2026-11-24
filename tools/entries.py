@@ -165,7 +165,7 @@ entry is over the threshold at more than THRESHOLD tokens, half of what Read ret
     still state the ruled-out claim in other words;
   - `OK: <n> outputs, <n> rulings, <n> pairs, <n> hits`. Exit 0.
   With `<entry>...` (the end of a mode that wrote or changed those entries' `## Conflicts` rulings,
-  SKILL.md › Rulings a run changed), it reads only those entries' rulings, against the outputs not
+  SKILL.md › Checks at the end), it reads only those entries' rulings, against the outputs not
   yet sent: the targets and the reports that are not Archived. Application folders (write freezes a
   folder once it is sent, and the Log records no send) and Archived reports are left for audit. It
   prints each `ruling:` line, a `check:` line only for a pair with a `wrong` or `do-not-use` hit,
