@@ -59,3 +59,5 @@ Now 列：
 | e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | PR #47 open, waitchecks | — |
 
 使用者說「Archive them」：第一輪九個 lane session 已 archive（worktree 都乾淨、都已在 master）。
+
+使用者說「Delete them」：第一輪九條已 merge 的遠端分支已刪。
