@@ -26,10 +26,18 @@ upgrades such a Log. A target older than the Log is refused when it is a Dev bui
 engine: replaces the Engine paths with <version>'s (the next step of the plan): checks out its
 files, deletes the Engine files it no longer has unless the Log added them, and puts this Log's
 own .gitignore lines back under `# This Log's own lines`. A front page (README.md, README.zh-TW.md)
-whose text above its entries heading is still the old Template's, unedited, gets <version>'s text
-there, its entries section and the rest kept. It copies that version's guide and script to
-.build/upgrade/ (a Dev build's: upgrade-next.*, the next release's guide as it stood) and prints
-`guide: <file>`, or `guide: none`.
+has two parts the Template writes, each checked on its own: the text above its entries heading, and
+the sections after its entries section; the entries section itself stays. A part still the old
+Template's, unedited, gets <version>'s text (the sections after the entries section also when they
+are an earlier release's, which an older tool left there), and prints
+`done: <page> above `## <heading>`: the Template's page, unedited, now <version>'s` or
+`done: <page> after its `## <heading>` section: the Template's text, unedited, now <version>'s`.
+Sections after the entries section that the Log changed, where <version> changes the Template's,
+stay as the Log has them, and it prints `review: <page> after its `## <heading>` section: this Log's
+own text; <version> changes the Template's there, from <old> to <new>`, <old> and <new> being
+.build/upgrade/pages/old/<page> and new/<page>, the Template's text there. It copies that version's
+guide and script to .build/upgrade/ (a Dev build's: upgrade-next.*, the next release's guide as it
+stood) and prints `guide: <file>`, or `guide: none`.
 reapply: after the last step, merges the `edited:` files given (or all of them, --all) back into the
 new Engine: `git merge-file` with the Log's version at `start:`, the old Template's as the base,
 and the new one. Prints `merged:`, `conflict: <path>: <n>` (markers left in the file) or
@@ -66,6 +74,11 @@ PAGES = {"README.md": "Entries", "README.zh-TW.md": "條目"}
 # logfiles.heading_re's pattern, copied: the mode runs this file alone from .build/upgrade/tools/,
 # with no logfiles.py beside it (tests/test_upgrade.py holds the two the same)
 HEADING = r"^##[ \t]+%s[ \t]*\r?$"
+SECTION = re.compile(r"^##[ \t]")   # a section's heading line, outside a code fence
+FENCE = re.compile(r"[ \t]*(`{3,}|~{3,})")   # logfiles.FENCE and its outside_code rule, copied
+# The Template's old and new text after the entries section, where the Log changed its own (review:)
+TEMPLATE_TEXT = os.path.join(BUILD, "pages")
+BOM = b"\xef\xbb\xbf"
 
 
 class UpgradeError(Exception):
@@ -152,33 +165,94 @@ def split_page(data, heading):
     return (text[:m.start()], text[m.start():]) if m else None
 
 
-def unedited_pages(root):
-    """{front page: (above its entries heading, the rest)} for each page whose text above that heading
-    is the Template's at HEAD."""
+def page_parts(data, heading):
+    """A front page's text as (above `## <heading>`, its entries section, the sections after it), LF
+    line ends; None when the page or the heading is missing. The entries section ends at the next
+    `## ` heading outside a code fence."""
+    page = split_page(data, heading)
+    if not page:
+        return None
+    above, rest = page
+    lines = rest.splitlines(keepends=True)
+    at, pos, fence = len(rest), len(lines[0]), None
+    for line in lines[1:]:
+        m = FENCE.match(line)
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line.strip(" \t`~\r\n"):
+                fence = None
+        elif m:
+            fence = m.group(1)
+        elif SECTION.match(line):
+            at = pos
+            break
+        pos += len(line)
+    return above, rest[:at], rest[at:]
+
+
+def pages_at_head(root, version):
+    """{front page: (its parts, the old Template's, the Template's texts after its entries section)}
+    at HEAD, for each page both have with the entries heading. The texts are the old Template's and
+    each fetched version's before version: an older tool left a Log's sections after its entries
+    section as they were, so they can be an earlier release's, unedited."""
+    earlier = [v for v in (r[len(REFS) + 1:] for r in git(root, "for-each-ref", "--format=%(refname)", REFS).splitlines())
+               if VERSION.match(v) and key(v) < key(version)]
     out = {}
     for rel, heading in PAGES.items():
-        mine = split_page(show(root, "HEAD", rel), heading)
-        theirs = split_page(show(root, "HEAD", "tools/template/" + rel), heading)
-        if mine and theirs and mine[0] == theirs[0]:
-            out[rel] = mine
+        mine = page_parts(show(root, "HEAD", rel), heading)
+        theirs = page_parts(show(root, "HEAD", "tools/template/" + rel), heading)
+        if mine and theirs:
+            texts = {theirs[2]}
+            for v in earlier:
+                parts = page_parts(show(root, ref(v), "tools/template/" + rel), heading)
+                if parts:
+                    texts.add(parts[2])
+            out[rel] = (mine, theirs, texts)
     return out
 
 
+def write_template_text(root, side, rel, text):
+    """Write the Template's text after a page's entries section to TEMPLATE_TEXT/<side>/<page>; return
+    that path from root, with / separators."""
+    path = os.path.join(TEMPLATE_TEXT, side, rel)
+    os.makedirs(os.path.join(root, os.path.dirname(path)), exist_ok=True)
+    with open(os.path.join(root, path), "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return path.replace(os.sep, "/")
+
+
 def update_pages(root, pages, version):
-    """Give each unedited front page version's text above its entries heading, keeping the rest and
-    the working tree's line ends."""
+    """Give each front page version's text above its entries heading, and after its entries section,
+    where that part is still the old Template's (after the entries section: any Template's of
+    pages_at_head); keep its entries section, and the working tree's line ends and byte order mark.
+    Sections after the entries section that the Log changed, where version changes the Template's,
+    stay, with a `review:` line naming the Template's old and new text there (TEMPLATE_TEXT)."""
     lines = []
-    for rel, (head, rest) in pages.items():
-        new = split_page(show(root, ref(version), "tools/template/" + rel), PAGES[rel])
-        if not new or new[0] == head:
+    for rel, (mine, old, texts) in pages.items():
+        new = page_parts(show(root, ref(version), "tools/template/" + rel), PAGES[rel])
+        if not new:
+            continue
+        above, entries, after = mine
+        if mine[0] == old[0] != new[0]:
+            above = new[0]
+            lines.append("done: %s above `## %s`: the Template's page, unedited, now %s's" % (rel, PAGES[rel], version))
+        where = "%s after its `## %s` section" % (rel, PAGES[rel])
+        if new[2] != mine[2]:
+            if mine[2] in texts:
+                after = new[2]
+                lines.append("done: %s: the Template's text, unedited, now %s's" % (where, version))
+            elif old[2] != new[2]:
+                lines.append("review: %s: this Log's own text; %s changes the Template's there, from %s to %s" % (
+                    where, version, write_template_text(root, "old", rel, old[2]),
+                    write_template_text(root, "new", rel, new[2])))
+        if (above, after) == (mine[0], mine[2]):
             continue
         dest = os.path.join(root, *rel.split("/"))
         with open(dest, "rb") as f:
-            crlf = b"\r\n" in f.read()
-        out = (new[0] + rest).encode("utf-8")
+            data = f.read()
+        out = (above + entries + after).encode("utf-8")
+        out = out.replace(b"\n", b"\r\n") if b"\r\n" in data else out
         with open(dest, "wb") as f:
-            f.write(out.replace(b"\n", b"\r\n") if crlf else out)
-        lines.append("done: %s above `## %s`: the Template's page, unedited, now %s's" % (rel, PAGES[rel], version))
+            f.write(BOM + out if data.startswith(BOM) else out)
     return lines
 
 
@@ -321,7 +395,7 @@ def engine(root, version):
         git(root, "rm", "-q", "--ignore-unmatch", "--", *gone)
         lines += ["done: deleted %s (not in %s)" % (p, version) for p in gone]
     present = [p for p in paths_new if files(root, new, [p])]
-    pages = unedited_pages(root)
+    pages = pages_at_head(root, version)
     git(root, "checkout", new, "--", *present)
     lines.append("done: Engine paths from %s" % version)
     lines += update_pages(root, pages, version)
