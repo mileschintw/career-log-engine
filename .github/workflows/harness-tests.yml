@@ -15,6 +15,7 @@ on:
       - "tools/logfiles.py"
       - "tools/config.py"
       - "tools/config.default.toml"
+      - "tools/chat_export.py"
       - ".github/workflows/harness-tests.yml"
 
 permissions:

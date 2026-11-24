@@ -15,6 +15,7 @@ on:
       - "tools/tests/test_checks_for.py"
       - "tools/export-template.sh"
       - ".github/workflows/**"
+      - "tools/logfiles.py"
       - ".github/workflows/checks-for-tests.yml"
 
 permissions:

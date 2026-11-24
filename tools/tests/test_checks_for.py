@@ -10,6 +10,13 @@ The parity test compares the steps that run a test or a script: `python -I <scri
 `sh -n <script>`, the PowerShell parse of `Resolve-Path <script>`, and tools/export-template.sh,
 and fails on a run: line naming python, sh or the like in any other form, and on a path filter
 other than `paths:` under `pull_request:`.
+
+EveryImport (#52) reads each py check's imports with ast, through every repo module they reach:
+import statements anywhere in a file (resolved beside it, then in tools/), and modules loaded by
+path or name (spec_from_file_location, import_module, __import__) whose argument it can tell. It
+fails on a module no group running the check has among its triggers (LEFT_OUT lists the rightful
+exceptions), or that their workflows' paths: lack. Standard and third-party modules, a script run
+as a subprocess, and a file loaded from a path it cannot tell (a scratch Log's copy) are left out.
 """
 import ast, contextlib, importlib.util, io, os, re, shutil, subprocess, sys, tempfile, time, unittest
 
@@ -233,11 +240,22 @@ def imported(rel, root=REPO):
     return seen
 
 
-def import_gaps(groups, root=REPO, workflows=None):
+# (check, module): a module the check imports that its group's triggers in GROUPS rightly leave out,
+# with why; its workflow's paths: still take it. test_the_list_holds_only_gaps fails on a stale entry.
+LEFT_OUT = {
+    # template_checks.py runs every test again in a fresh export, so only its own script triggers it
+    # (#33); a change to either module runs that module's own tests, and template-scan.yml's paths:
+    # (the whole export, tools/ included) runs template_checks.py on it in CI
+    ("maintainer/template_checks.py", "tools/checks_for.py"): "runs every test again",
+    ("maintainer/template_checks.py", "tools/logfiles.py"): "runs every test again",
+}
+
+
+def import_gaps(groups, root=REPO, workflows=None, left_out=LEFT_OUT):
     """#52: each module a py check imports (imported()) that a change to would not run it: one no
-    group running that check has among its triggers (GROUPS), or, given workflows ({name: text}),
-    none of those groups' workflows has in its paths:. A check whose script is not in root (maintainer/
-    in a Template) is left out. [] when every module is covered."""
+    group running that check has among its triggers (GROUPS), unless left_out lists it, or, given
+    workflows ({name: text}), none of those groups' workflows has in its paths:. A check whose script
+    is not in root (maintainer/ in a Template) is left out. [] when every module is covered."""
     runners = {}
     for g in groups:
         for c in g[3]:
@@ -250,7 +268,7 @@ def import_gaps(groups, root=REPO, workflows=None):
         flows = sorted({g[1] for g in gs if g[1] and workflows and g[1] in workflows})
         paths = [p[:-2] if p.endswith("/**") else p for f in flows for p in workflow_paths(workflows[f])[0] or []]
         for module in sorted(imported(script, root)):
-            if not any(checks_for.matches(module, t) for t in triggers):
+            if (script, module) not in left_out and not any(checks_for.matches(module, t) for t in triggers):
                 problems.append("%s imports %s: no group that runs it (%s) has it in tools/checks_for.py GROUPS"
                                 % (script, module, names))
             if flows and not any(checks_for.matches(module, p) for p in paths):
@@ -272,29 +290,36 @@ class Typical(unittest.TestCase):
         self.assertIn("tools/skill_lint.py", got)
 
     def test_scan(self):
+        # check_save.py imports dashboard.py, which imports scan.py; check.py and application.py load
+        # check_save.py (#52)
         self.assertEqual(scripts(runs(["tools/scan.py"])),
-                         ["tools/export-template.sh", "tools/tests/test_scan.py", "tools/tests/test_fit.py",
-                          "tools/tests/test_dashboard.py", "tools/tests/test_logfiles.py"])
+                         ["tools/export-template.sh", "tools/tests/test_check_run.py", "tools/tests/test_check_save.py",
+                          "tools/tests/test_check.py", "tools/tests/test_scan.py", "tools/tests/test_fit.py",
+                          "tools/tests/test_dashboard.py", "tools/tests/test_application.py",
+                          "tools/tests/test_logfiles.py"])
 
     def test_entries(self):
         # tools/logfiles.py is imported by every tool tools/entries.py is, and by tools/sync.py and
         # tools/config.py (which test_guide.py and test_upgrade.py load too), tools/resume.py and tools/chat_export.py
-        # (which test_perplexity.py loads)
-        # (tools/chat_export.py imports logfiles.py but not entries.py)
-        both = ["tools/tests/test_check_run.py",
+        # (which test_perplexity.py loads); test_chat_export.py loads entries.py itself, and
+        # maintainer/prepush.py imports deny_coverage.py, which imports both (#52)
+        both = ["tools/export-template.sh", "tools/tests/test_chat_export.py", "tools/tests/test_check_run.py",
                 "tools/tests/test_check_save.py", "tools/tests/test_deny_coverage.py", "tools/tests/test_logfiles.py",
                 "tools/tests/test_entries.py"]
-        self.assertEqual(scripts(runs(["tools/entries.py"])), ["tools/export-template.sh"] + both + [
+        self.assertEqual(scripts(runs(["tools/entries.py"])), both + [
             "tools/tests/test_check.py", "tools/tests/test_scan.py",
-            "tools/tests/test_fit.py", "tools/tests/test_dashboard.py", "tools/tests/test_writing_lint.py",
-            "tools/tests/test_application.py"])
-        self.assertEqual(scripts(runs(["tools/logfiles.py"])), ["tools/export-template.sh", "tools/tests/test_chat_export.py"] + both + [
+            "tools/tests/test_fit.py", "tools/tests/test_dashboard.py"]
+            + (["maintainer/tests/test_prepush.py"] if SOURCE else []) + [
+            "tools/tests/test_writing_lint.py", "tools/tests/test_application.py"])
+        self.assertEqual(scripts(runs(["tools/logfiles.py"])), both + [
             "tools/tests/test_config.py", "tools/tests/test_check.py", "tools/tests/test_speech.py",   # speech.py imports logfiles (#773)
             "tools/tests/test_resume.py", "tools/tests/test_guide.py", "tools/tests/test_skill_lint.py", "tools/skill_lint.py", "tools/tests/test_scan.py",
             "tools/tests/test_fit.py", "tools/tests/test_dashboard.py", "tools/tests/test_sponsorship.py", "tools/tests/test_perplexity.py",
-            "tools/tests/test_upgrade.py"] + (["maintainer/tests/test_harness.py"] if SOURCE else []) + [
+            "tools/tests/test_upgrade.py"]
+            + (["maintainer/tests/test_coord.py", "maintainer/tests/test_devbuild.py",   # #52
+                "maintainer/tests/test_prepush.py", "maintainer/tests/test_harness.py"] if SOURCE else []) + [
             "tools/tests/test_writing_lint.py", "tools/tests/test_application.py",
-            "tools/tests/test_sync.py"])
+            "tools/tests/test_sync.py", "tools/tests/test_checks_for.py"])
 
     def test_writing_md(self):
         # tools/writing_lint.py reads its word lists from writing.md
@@ -690,6 +715,13 @@ class EveryImport(unittest.TestCase):
 
     def test_every_import_is_a_trigger(self):
         self.assertEqual(import_gaps(checks_for.GROUPS, REPO, read_workflows()), [])
+
+    @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
+    def test_the_list_holds_only_gaps(self):
+        # each LEFT_OUT entry is still imported and still missing from its groups' triggers
+        self.assertEqual(sorted(import_gaps(checks_for.GROUPS, left_out={})),
+                         sorted("%s imports %s: no group that runs it (template checks) has it in tools/checks_for.py "
+                                "GROUPS" % k for k in LEFT_OUT))
 
     @unittest.skipUnless(SOURCE, "not the Template's source: no maintainer/")
     def test_a_planted_gap_fails(self):

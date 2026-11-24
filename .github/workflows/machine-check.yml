@@ -17,6 +17,9 @@
 # and the examples of SKILL.md › Modes, so the tests run when those change too.
 # tools/speech.py (#707) is a fourth group: check.py offers and detects it, and its own tests need no
 # backend.
+# paths: also takes every tool check.py loads by name (application.py, check_save.py and what they
+# import): tools/tests/test_checks_for.py's EveryImport fails on a module a test imports that
+# paths: lacks (#52).
 # This repo's own CI: never exported to the Template.
 name: Machine check tests
 
@@ -45,6 +48,13 @@ on:
       - "tools/speech-requirements.txt"
       - "tools/tests/test_speech.py"
       - "tools/tests/speech/**"
+      - "tools/application.py"
+      - "tools/check_save.py"
+      - "tools/writing_lint.py"
+      - "tools/fit.py"
+      - "tools/scan.py"
+      - "tools/dashboard.py"
+      - "tools/sponsorship.py"
       - ".github/workflows/machine-check.yml"
 
 permissions:

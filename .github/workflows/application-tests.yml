@@ -19,6 +19,11 @@ on:
       - "skills/career-log/writing.md"
       - "tools/tests/test_application.py"
       - "tools/tests/test_writing_lint.py"
+      - "tools/config.py"
+      - "tools/fit.py"
+      - "tools/sponsorship.py"
+      - "tools/dashboard.py"
+      - "tools/scan.py"
       - ".github/workflows/application-tests.yml"
 
 permissions:
