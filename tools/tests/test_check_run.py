@@ -544,7 +544,7 @@ class CopyBase(unittest.TestCase):
         self.base = self.git("rev-parse", "HEAD").strip()
 
     def tearDown(self):
-        shutil.rmtree(self.copy, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        check_run.logfiles.rmtree(self.copy)
 
     def git(self, *args):
         return subprocess.run(["git", "-C", self.copy, "-c", "user.email=test@example.invalid", "-c", "user.name=Test",
@@ -580,6 +580,8 @@ class CopyBase(unittest.TestCase):
         if not os.path.isdir(remote):
             subprocess.run(["git", "init", "-q", "--bare", "-b", branch, remote], check=True, capture_output=True)
             self.addCleanup(shutil.rmtree, remote, True)
+            check_run.logfiles.no_maintenance(remote)   # it receives a push, and the copy fetches
+            check_run.logfiles.no_maintenance(self.copy)
             self.git("remote", "add", "origin", remote)
         self.git("push", "-q", "-f", "origin", "HEAD:" + branch)
         self.git("fetch", "-q", "origin")
@@ -1425,7 +1427,7 @@ class OutsideRootAndPaths(unittest.TestCase):
         os.makedirs(os.path.join(self.root, "entries"))
 
     def tearDown(self):
-        shutil.rmtree(self.tmp, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        check_run.logfiles.rmtree(self.tmp)
 
     def evs(self, blocks):
         return transcript(self.tmp, blocks)[0]

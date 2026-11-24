@@ -4,7 +4,7 @@ local bare repository as the template remote) for publish; nothing reaches GitHu
 
   python3 -I maintainer/tests/test_coord.py
 """
-import ast, importlib.util, io, json, os, re, shutil, subprocess, tempfile, unittest
+import ast, importlib.util, io, json, os, re, shutil, subprocess, sys, tempfile, unittest
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,16 +19,10 @@ def load(name):
 
 
 coord = load("coord")
+sys.path.insert(0, os.path.join(REPO, "tools"))
+import logfiles  # noqa: E402
 
 GH_REPO = "owner/repo"
-
-
-def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows."""
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
-    shutil.rmtree(path, onerror=retry)
 
 
 def git(cwd, *args):
@@ -64,7 +58,7 @@ class Temp(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
 
     def tearDown(self):
-        rmtree(self.tmp)
+        logfiles.rmtree(self.tmp)
 
 
 class FakeGh:
@@ -160,6 +154,7 @@ class Publish(Temp):
         self.tpl_remote = os.path.join(self.tmp, "tpl.git")
         seed = os.path.join(self.tmp, "tpl-seed")
         git(self.tmp, "init", "-q", "--bare", "-b", "main", self.tpl_remote)
+        logfiles.no_maintenance(self.tpl_remote)   # it receives a push: no gc left running at tearDown
         git(self.tmp, "clone", "-q", self.tpl_remote, seed)
         identity(seed)
         write(os.path.join(seed, "stale.md"), "from the last release\n")

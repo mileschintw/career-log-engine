@@ -31,14 +31,6 @@ ALLOW = 'ALLOW="skills tools AGENTS.md .gitignore"\n'
 OLD_SHA = "e6a5565a4807db1ab30b0eb70f8c2fd1421ac4df"
 
 
-def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows."""
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
-    shutil.rmtree(path, onerror=retry)
-
-
 def git(cwd, *args):
     return subprocess.run(["git", "-C", cwd, "-c", "core.autocrlf=false", *args], check=True,
                           capture_output=True, text=True).stdout
@@ -61,6 +53,7 @@ def init(path):
     git(path, "config", "user.email", "test@example.com")
     git(path, "config", "user.name", "Test")
     git(path, "config", "core.autocrlf", "false")
+    logfiles.no_maintenance(path)   # upgrade.py fetches the releases into a Log: no gc left running
 
 
 V020 = {
@@ -95,7 +88,7 @@ class Upgrade(unittest.TestCase):
         self.url = "file://" + self.tpl.replace("\\", "/")
 
     def tearDown(self):
-        rmtree(self.tmp)
+        logfiles.rmtree(self.tmp)
 
     def log(self, version="0.2.0", edits=None, name="log"):
         """A Log made from v<version>, its first commit only, with edits committed on top."""
@@ -190,7 +183,7 @@ class Upgrade(unittest.TestCase):
             self.assertIn("upgrade to v%s first" % upgrade.BRIDGE, out[0])
             self.assertEqual((upgrade.FLOOR, upgrade.BRIDGE), ("0.2.0", "0.3.2"))   # the docs name both
             self.assertFalse(os.path.exists(upgrade.state_path(log)))
-            rmtree(log)
+            logfiles.rmtree(log)
 
     def test_plan_next_stamp(self):
         rc, out = self.plan(self.log(edits={"tools/TEMPLATE_VERSION": "next\nsource 3333333\n"}))
@@ -663,7 +656,7 @@ class Upgrade(unittest.TestCase):
         self.assertIn("0.3.2-dev.1, 0.3.2-dev.2", out[0])
         self.assertEqual(self.plan(log, "--to", "next")[0], 2)   # `next` is never a target
         self.assertEqual(self.plan(log, "--to", "0.3.2-dev")[0], 2)
-        rmtree(log)
+        logfiles.rmtree(log)
         rc, out = self.plan(self.log(edits={"tools/TEMPLATE_VERSION": "0.3.2-dev.5\nsource 0000000\n"}))
         self.assertEqual(rc, 1, out)
         self.assertTrue(out[0].startswith("stop: this Log's version 0.3.2-dev.5 has no Dev build tag at "), out)
@@ -704,7 +697,7 @@ class Export(unittest.TestCase):
         git(self.src, "config", "user.name", "Test")
 
     def tearDown(self):
-        rmtree(self.tmp)
+        logfiles.rmtree(self.tmp)
 
     def export(self, *args, dest="out"):
         r = subprocess.run(["sh", "tools/export-template.sh", *args, os.path.join(self.tmp, dest)],
@@ -921,7 +914,7 @@ class NextGuide(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
 
     def tearDown(self):
-        rmtree(self.tmp)
+        logfiles.rmtree(self.tmp)
 
     @unittest.skipUnless(GIT, NOT_GIT)
     def test_next_guide_runs_again_on_a_migrated_log(self):
@@ -992,7 +985,7 @@ class Source(unittest.TestCase):
         if not hasattr(guide, "check_status"):
             self.skipTest("the 0.3.0 guide no longer holds #574's checks")
         root = tempfile.mkdtemp()
-        self.addCleanup(rmtree, root)
+        self.addCleanup(logfiles.rmtree, root)
         os.makedirs(os.path.join(root, "tools"))
         for name in ("entries.py", "logfiles.py"):
             shutil.copy(os.path.join(TOOLS, name), os.path.join(root, "tools", name))
@@ -1036,7 +1029,7 @@ class Source(unittest.TestCase):
         if guide is None:
             self.skipTest("no guide holds #695's check")
         root = tempfile.mkdtemp()
-        self.addCleanup(rmtree, root)
+        self.addCleanup(logfiles.rmtree, root)
         os.makedirs(os.path.join(root, "tools"))
         for name in ("entries.py", "logfiles.py"):
             shutil.copy(os.path.join(TOOLS, name), os.path.join(root, "tools", name))
@@ -1075,7 +1068,7 @@ def main_rerun(argv):
         shutil.copytree(argv[0], log, symlinks=True)
         faults = run_again(log)
     finally:
-        rmtree(tmp)
+        logfiles.rmtree(tmp)
     for fault in faults:
         print("FAIL: " + fault)
     print("FAIL: the guide cannot run again" if faults else "OK: the guide ran again with no change")

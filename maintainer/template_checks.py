@@ -16,7 +16,7 @@ Uncommitted edits are not exported: commit first.
 Exit 0 when every check passed, 1 when one failed or the export did, 2 on a bad argument. Standard
 library only, Python 3.11+. The temporary folder is removed at the end.
 """
-import argparse, glob, os, shutil, subprocess, sys, tempfile, time
+import argparse, glob, os, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +26,7 @@ if TOOLS not in sys.path:   # -I leaves the script's folder off sys.path, and th
     sys.path.insert(0, TOOLS)
 sys.dont_write_bytecode = True
 import checks_for
+import logfiles
 
 LINT = "tools/skill_lint.py"
 
@@ -56,23 +57,6 @@ def export(scratch):
     except OSError as e:   # no git on PATH
         raise RuntimeError("git: %s" % e)
     return out
-
-
-def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows, and takes a file
-    already gone as removed (maintainer/devbuild.py's; #24 makes one helper of them)."""
-    def retry(func, p, exc):
-        if isinstance(exc, FileNotFoundError) or (isinstance(exc, tuple) and exc[0] is FileNotFoundError):
-            return
-        try:
-            os.chmod(p, 0o700)
-            func(p)
-        except FileNotFoundError:
-            pass
-    if sys.version_info >= (3, 12):
-        shutil.rmtree(path, onexc=retry)
-    else:
-        shutil.rmtree(path, onerror=retry)
 
 
 def scripts(template):
@@ -111,7 +95,7 @@ def main(argv=None):
         print("FAIL: %d of %d failed" % (failed, len(found)) if failed else "OK")
         return 1 if failed else 0
     finally:
-        rmtree(scratch)
+        logfiles.rmtree(scratch)
 
 
 if __name__ == "__main__":

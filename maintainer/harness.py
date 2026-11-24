@@ -363,10 +363,12 @@ def cmd_copy(a):
     remote, log = os.path.join(t, "remote.git"), os.path.join(t, "log")
     git(t, "init", "-q", "--bare", "-b", default, remote)
     git(remote, "config", "core.longpaths", "true")
+    logfiles.no_maintenance(remote)   # it fetches and receives pushes, and the log fetches: no gc left running
     git(remote, "fetch", "-q", worktree, "+%s:%s" % (branch, default))
     run(["git", "-c", "core.longpaths=true", "clone", "-q", remote, log])
     for k, v in (("core.longpaths", "true"), ("user.email", "test@example.invalid"), ("user.name", "Test")):
         git(log, "config", k, v)
+    logfiles.no_maintenance(log)
     make_home(t)
     head = out(remote, "rev-parse", default)
     save(t, {"kind": "copy", "worktree": worktree, "branch": branch, "default": default, "head": head,
@@ -398,6 +400,7 @@ def cmd_template_copy(a):
     git(t, "init", "-q", "-b", default, log)
     for k, v in (("core.longpaths", "true"), ("user.email", "test@example.invalid"), ("user.name", "Test")):
         git(log, "config", k, v)
+    logfiles.no_maintenance(log)   # it pushes and fetches: no gc left running
     shutil.copytree(export, log, dirs_exist_ok=True)
     make_home(t)
     # a release before update_check (0.1.0) has no update check to turn off
@@ -468,6 +471,7 @@ def seed(t):
     git(log, "commit", "-qm", "seed")
     git(t, "init", "-q", "--bare", "-b", default, remote)
     git(remote, "config", "core.longpaths", "true")
+    logfiles.no_maintenance(remote)   # it receives pushes
     git(log, "remote", "add", "origin", remote)
     git(log, "push", "-qu", "origin", default)
     git(log, "remote", "set-head", "origin", default)
@@ -505,7 +509,7 @@ def cmd_reset(a):
     unlink_dir(os.path.join(t, "config", "skills", "career-log"))   # the link only, never the skill
     for folder in (process_dir(t), os.path.join(t, "config")):   # the last process run's
         if os.path.isdir(folder):
-            rmtree(folder)
+            logfiles.rmtree(folder)
     for repo in (log, remote):
         for name in out(repo, "branch", "--format=%(refname:short)").splitlines():
             if name and name != default:
@@ -1183,19 +1187,6 @@ def cmd_report(a):
 
 # ---- remove ----
 
-def writable(func, path, _):
-    os.chmod(path, stat.S_IWRITE)
-    func(path)
-
-
-def rmtree(path):
-    """shutil.rmtree that also deletes git's read-only files (onerror is deprecated from 3.12)."""
-    if sys.version_info >= (3, 12):
-        shutil.rmtree(path, onexc=writable)
-    else:
-        shutil.rmtree(path, onerror=writable)
-
-
 def cmd_remove(a):
     failed = 0
     for t in a.t:
@@ -1206,7 +1197,7 @@ def cmd_remove(a):
             print("credentials: %s could not be deleted: delete it after the session ends" % slashed(left))
             failed = 1
         try:
-            rmtree(t)
+            logfiles.rmtree(t)
             print("removed: %s" % t)
         except OSError as e:
             print("locked: %s (%s): delete it after the session ends" % (t, e.strerror or e))

@@ -82,7 +82,7 @@ class CheckSave(unittest.TestCase):
         self.git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "base")
 
     def tearDown(self):
-        shutil.rmtree(self.tmp, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))   # git's read-only objects
+        check_save.logfiles.rmtree(self.tmp)
 
     def write(self, rel, body):
         path = os.path.join(self.root, *rel.split("/"))

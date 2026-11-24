@@ -16,7 +16,7 @@ devbuild = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(devbuild)
 
 
-rmtree = devbuild.rmtree
+rmtree = devbuild.logfiles.rmtree
 
 
 def git(cwd, *args):

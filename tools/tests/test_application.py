@@ -79,7 +79,7 @@ class Base(unittest.TestCase):
         self.commit("base")
 
     def tearDown(self):
-        shutil.rmtree(self.tmp, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))   # git's read-only objects
+        application.logfiles.rmtree(self.tmp)
 
     def git(self, *args):
         return subprocess.run(["git", "-C", self.root] + list(args), check=True, capture_output=True,
@@ -1922,7 +1922,7 @@ class Pages(PrepBase):
         self.assertIn("'card.md#intro' names no file", out[2])
 
     def test_outside_a_git_repository_there_is_no_stale_check(self):
-        shutil.rmtree(os.path.join(self.root, ".git"), onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        application.logfiles.rmtree(os.path.join(self.root, ".git"))
         code, out = self.status()
         self.assertEqual(code, 0, out)
         self.assertFalse([l for l in out if l.startswith("stale:")], out)

@@ -3580,7 +3580,7 @@ class EntryChanges(unittest.TestCase):
     """The per-entry git log application.py stale and story-stale share (#661)."""
     def test_changes_uncommitted_and_gone(self):
         root = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, root, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        self.addCleanup(entries.logfiles.rmtree, root)
         git = lambda *a: subprocess.run(["git", "-C", root, "-c", "user.name=t", "-c", "user.email=t@example.com"]
                                         + list(a), check=True, capture_output=True, encoding="utf-8").stdout
         git("init", "-q")

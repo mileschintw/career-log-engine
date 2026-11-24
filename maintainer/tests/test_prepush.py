@@ -4,7 +4,7 @@ local bare repository as the remote) and a scratch deny list; nothing reaches Gi
 
   python3 -I maintainer/tests/test_prepush.py
 """
-import importlib.util, io, os, re, shutil, subprocess, sys, tempfile, unittest
+import importlib.util, io, os, re, subprocess, sys, tempfile, unittest
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,14 +25,8 @@ def load(name):
 
 
 prepush = load("prepush")
-
-
-def rmtree(path):
-    """shutil.rmtree that also removes git's read-only object files on Windows."""
-    def retry(func, p, _):
-        os.chmod(p, 0o700)
-        func(p)
-    shutil.rmtree(path, onerror=retry)
+sys.path.insert(0, os.path.join(HERE, "..", "..", "tools"))
+import logfiles  # noqa: E402
 
 
 def git(cwd, *args, check=True):
@@ -62,6 +56,8 @@ class Repo(unittest.TestCase):
         for k, v in (("user.email", "test@example.com"), ("user.name", "Test")):
             git(self.repo, "config", k, v)
         git(self.repo, "remote", "add", "origin", self.remote)
+        for repo in (self.repo, self.remote):   # a push: no gc left running at tearDown
+            logfiles.no_maintenance(repo)
         self.commit({"README.md": "hello\n"}, "Start")
         git(self.repo, "push", "-q", "origin", "master")
         self.cwd = os.getcwd()
@@ -69,7 +65,7 @@ class Repo(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self.cwd)
-        rmtree(self.tmp)
+        logfiles.rmtree(self.tmp)
 
     def commit(self, files, message):
         for path, text in files.items():
