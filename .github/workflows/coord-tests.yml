@@ -1,7 +1,7 @@
 # Runs the tests of the maintainer's coordination tools (maintainer/coord.py: blocked-by marks and a
 # Template release's staging; maintainer/devbuild.py: a Dev build; .github/workflows/closing_refs.py's
-# check; maintainer/prepush.py, the pre-push check against the deny list). test_coord.py's guard reads
-# every maintainer/*.py, so each is in paths: (a new one goes there and in checks_for.py's coord group).
+# check; maintainer/prepush.py, the pre-push check against the deny list). The guards of test_coord.py
+# and test_devbuild.py read every maintainer/*.py, so paths: takes them all, a new one too (#46).
 # Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11). Its Windows code
 # (Git for Windows' sh) is left to the session that changes it, which runs these tests on the
 # maintainer's own machine (SETUP.md step 7): Windows took four minutes here, billed twice (the
@@ -12,12 +12,10 @@ name: Coord tests
 on:
   pull_request:
     paths:
-      - "maintainer/coord.py"
+      - "maintainer/*.py"
       - "maintainer/tests/test_coord.py"
       - "maintainer/tests/test_closing_refs.py"
-      - "maintainer/devbuild.py"
       - "maintainer/tests/test_devbuild.py"
-      - "maintainer/harness.py"
       - "maintainer/prepush.py"
       - "maintainer/hooks/pre-push"
       - "maintainer/tests/test_prepush.py"
