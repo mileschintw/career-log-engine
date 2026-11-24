@@ -30,7 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | started | — |
+| e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | PR #45 open, waitchecks | — |
 | e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | started | #33 merges（GO #e22） |
 
 **Main checkout:** none.
