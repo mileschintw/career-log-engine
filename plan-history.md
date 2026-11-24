@@ -85,3 +85,5 @@ Now 列：
 | e24 | pr | #24 | local_fb3ec7ec-9018-4991-91b5-6622fdb72507（落在已 archive 的 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e24-48edc9`） | PR #53 open, waitchecks | — |
 
 2026-11-23 21:22 -0800 使用者說「Archive 並刪分支」：第二輪三個 lane session（e46、e37、e24）已 archive（worktree 乾淨、都已在 master），三條遠端分支 `claude/lane-e46-0d3d17`、`claude/lane-e37-be3720`、`claude/lane-e24-48edc9` 已刪。
+
+- **第三輪（2026-11-23 22:55 -0800）：** 使用者說開工。#17、#29、#49、#52 triage 成 ready-for-agent；#52 加了 guard 的 acceptance，#29 記下使用者選的 template-copy＋fixture，#17、#29 補了 Files 節。

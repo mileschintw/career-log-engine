@@ -9,13 +9,13 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id unknown, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-23 21:31 -0800）：** 第二輪 session 已 archive、分支已刪。第三輪提案在 Waiting（e52、e17、e29），等使用者說開工。
+- **Next（2026-11-23 22:55 -0800）：** 第三輪開工：e52、e17、e29。開 session、寫 Now 列、設鬧鐘；PR CI 過就 merge。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** none（第二輪的已結束，在 `plan-history.md`〈第二輪結束〉）
+- **Merge right:** 2026-11-23 22:55 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第三輪的三條 lane 嗎？）：lanes e52、e17、e29。
 - **Unattended log:** none
 
 ## Rulings
@@ -39,12 +39,12 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
-| #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 1`（item 4） | free；第三輪提案 lane e17（和 #49 一起）：triage 成 ready-for-agent，master 的 step 1 item 4 仍說目標的文字是「newer mode」 |
+| #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 1`（item 4） | 第三輪 lane e17 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：要使用者在 Direction 的四個選項裡選（建議先 1、3，2、4 等量過成本） |
-| #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | 1 | none | none | `maintainer/harness.py › copy`、`docs/maintaining-tests.md › Harness` | free；第三輪提案 lane e29，要使用者選來源（建議 template-copy＋fixture） |
+| #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | 1 | none | none | `maintainer/harness.py › copy`、`docs/maintaining-tests.md › Harness` | 第三輪 lane e29 |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #49 升級模式：Sonnet 在 step 5 摘要重複 Dev build 警告 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 5` | free；第三輪提案 lane e17（第二個 fix round，使用者開工就算同意） |
-| #52 maintainer 工具 import `tools/logfiles.py`，但 coord／dev build／prepush 群組和 `coord-tests.yml` 沒列 | 1 | none | none | `tools/checks_for.py › GROUPS`、`coord-tests.yml › paths:`、`tools/tests/test_checks_for.py` | free；第三輪提案 lane e52（加從 import 推出觸發清單的 guard） |
+| #49 升級模式：Sonnet 在 step 5 摘要重複 Dev build 警告 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 5` | 第三輪 lane e17 |
+| #52 maintainer 工具 import `tools/logfiles.py`，但 coord／dev build／prepush 群組和 `coord-tests.yml` 沒列 | 1 | none | none | `tools/checks_for.py › GROUPS`、`coord-tests.yml › paths:`、`tools/tests/test_checks_for.py` | 第三輪 lane e52 |
 
 ## Waiting for the user to be present
 
@@ -52,12 +52,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第三輪提案（since 2026-11-23 21:31 -0800）：** 三條 lane，檔案不重疊，可同時跑：
-  - **e52（#52）：** 把 `tools/logfiles.py` 加進 coord／dev build／prepush 群組和 `coord-tests.yml › paths:`，再加一個 guard：每個 maintainer 測試 import 到的 repo 檔（遞迴）都要在它的群組裡，漏列就失敗。開工時把這段補進 #52。
-  - **e17（#17、#49）：** 都在 `modes/upgrade.md`。#17：Log 在比最新 release 新的 Dev build、使用者沒指定目標時，step 1 不交給較舊 release 的文字。#49：step 5 寫明摘要只講每步改了什麼。Sonnet、Opus medium 的 agent case，一個 fix round。
-  - **e29（#29）：** 要使用者選 agent case 的 Log 來源。建議 `template-copy`＋fixture（公開 repo 不碰真資料），`harness.py copy` 和 `docs/maintaining-tests.md › Harness` 照改。
-  - 不排：#28（要使用者在四個選項裡選，建議先 1、3）、#30（Long-term）。
-  - Log 升級 prompt：建議第三輪 merge 後再寫，一次帶上三輪的改動。
+- **第三輪結束後：** #28（四個選項選哪些，建議先 1、3）；Log 升到最新 Dev build 的 prompt（寫到私人記錄）。
 
 ## Deadlines
 
