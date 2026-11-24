@@ -231,7 +231,7 @@ class TestCopy(Base):
 
     def test_refuses_a_branch_that_holds_log_data(self):
         """#29: copy never takes a real record; a case that reads the Log takes template-copy and fixtures."""
-        for path in ("profile.md", "entries/2026-01-01-x.md", "outputs/x.md"):
+        for path in ("profile.md", "entries/2026-01-01-x.md", "outputs/x.md", "entries/2026-01-02-甲 乙.md"):
             with self.subTest(path=path):
                 write(os.path.join(self.wt, path), "x\n")
                 git(self.wt, "add", path)

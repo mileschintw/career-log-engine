@@ -46,9 +46,9 @@ copy           builds a copy of <b> as it is committed in <w> (an uncommitted ch
                is the Engine and the maintainer's files, for a case that runs in this repo itself;
                a case that reads entries, profile or direction takes template-copy and fixtures.
                A <b> that holds Log data is refused; reset refuses it too. When update_check is not
-               off, a commit `test: update_check off` on top
-               of the head under test turns it off and is pushed; it changes no Engine file. Then
-               runs verify. <t> must be empty or missing.
+               off, a commit `test: update_check off` on top of the head under test turns it off
+               and is pushed; it changes no Engine file. Then runs verify. <t> must be empty or
+               missing.
 template-copy  builds a copy from `tools/export-template.sh` of <w>'s committed head: a new Log
                with no history, its seed commit with the head's executable bits, as "Use this
                template" gives them (a copy on Windows has no executable bit to stage). --from
@@ -367,8 +367,8 @@ NOT_DATA = ("README.md", "README.zh-TW.md", "config.toml")
 
 def no_log_data(worktree, branch):
     """Refuse a <branch> that holds Log data (#29: this repo holds none, and a copy takes none)."""
-    paths = out(worktree, "ls-tree", "-r", "--name-only", "--full-tree", branch).splitlines()
-    data = [p for p in paths if logfiles.is_log_path(p) and p not in NOT_DATA]
+    paths = out(worktree, "ls-tree", "-r", "-z", "--name-only", "--full-tree", branch).split("\0")
+    data = [p for p in paths if p and logfiles.is_log_path(p) and p not in NOT_DATA]
     if data:
         raise Fail("%s holds Log data (%s%s): copy takes the Engine only (docs/maintaining-tests.md › "
                    "Build one scratch copy per concurrent run)"
