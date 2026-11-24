@@ -31,22 +31,33 @@ Prints the release tags it fetched, `dev build: v<version>`, its commit and its 
 command when --push is not given. Exit 0 when done, 1 when a check fails (the reason on stderr), 2 on a usage error.
 Standard library only, Python 3.11+.
 """
-import argparse, importlib.util, os, re, shutil, subprocess, sys, tempfile
+import argparse, importlib.util, os, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location("coord", os.path.join(HERE, "coord.py"))
 coord = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(coord)
 Fail, git = coord.Fail, coord.git
+# The forms of a release and a Dev build version, and their order, are tools/upgrade.py's (#22)
+upgrade = coord.upgrade
 
-RELEASE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 NO_CHANGE = "No Log format change yet."
 NEXT_GUIDE = "docs/upgrades/upgrade-next.md"
 
 
+def is_release_tag(name):
+    """Whether name is a release's tag: v and a release version (upgrade.SEMVER)."""
+    return name.startswith("v") and upgrade.SEMVER.match(name[1:]) is not None
+
+
 def release_tags(names):
-    """The (major, minor, patch) of each release tag vX.Y.Z in names."""
-    return [tuple(int(n) for n in m.groups()) for m in map(RELEASE.match, names) if m]
+    """The version X.Y.Z of each release tag vX.Y.Z in names."""
+    return [n[1:] for n in names if is_release_tag(n)]
+
+
+def latest_release(names):
+    """The newest release of the release tags in names, in upgrade.key's order; None when there is none."""
+    return max(release_tags(names), key=upgrade.key, default=None)
 
 
 def remote_tags(url):
@@ -58,7 +69,7 @@ def remote_tags(url):
 
 
 def next_version(latest, format_change):
-    major, minor, patch = latest
+    major, minor, patch = map(int, upgrade.SEMVER.match(latest).groups())
     return "%d.%d.0" % (major, minor + 1) if format_change else "%d.%d.%d" % (major, minor, patch + 1)
 
 
@@ -71,15 +82,16 @@ def holds_format_change(root, source):
 
 
 def dev_number(tags, version):
-    want = re.compile(r"^v%s-dev\.([1-9]\d*)$" % re.escape(version))
-    return max([int(m.group(1)) for m in map(want.match, tags) if m], default=0) + 1
+    """One more than the highest n of the tags v<version>-dev.<n> in tags, 1 when there is none."""
+    builds = [t[1:] for t in tags if t.startswith("v") and upgrade.is_dev(t[1:])]
+    return max([upgrade.key(b)[4] for b in builds if b.split("-", 1)[0] == version], default=0) + 1
 
 
 def bring_releases(dest, url, url_tags, dest_tags):
     """Fetch into dest each release tag vX.Y.Z of url that dest does not have, so that a Log can
     upgrade with dest as its one --url: the plan reads the releases and the Log's own version there
     (#19). A tag dest has already stays as it is. Returns the tags fetched."""
-    want = [n for n in url_tags if RELEASE.match(n) and n not in dest_tags]
+    want = [n for n in url_tags if is_release_tag(n) and n not in dest_tags]
     if want:
         git(dest, "-c", "maintenance.auto=false", "-c", "gc.auto=0", "fetch", "-q", "--no-tags", url,
             *("refs/tags/%s:refs/tags/%s" % (n, n) for n in want))
@@ -151,10 +163,10 @@ def build(a):
     # a local path, as git reads it from dest's folder as well as from here
     url = os.path.abspath(a.releases) if os.path.exists(a.releases) else a.releases
     url_tags = remote_tags(url)
-    releases = release_tags(dest_tags) + release_tags(url_tags)
-    if not releases:
+    latest = latest_release(dest_tags + url_tags)
+    if latest is None:
         raise Fail("no release tag vX.Y.Z in %s or %s: a Dev build is of the release after one" % (a.releases, dest))
-    version = next_version(max(releases), holds_format_change(root, source))
+    version = next_version(latest, holds_format_change(root, source))
     version += "-dev.%d" % dev_number(dest_tags, version)
     tag = "v" + version
     parent = git(dest, "rev-parse", "-q", "--verify", ref + "^{commit}", check=False) or None
