@@ -1,9 +1,9 @@
 """The helpers the Log's tools share: reading and writing its files, front matter, Markdown tables
-and sections, heading anchors, slugs, dated names, git, the Log's root and its own files, the
-applications it records, the Target versions and the start record, a posting run's folder, a
-session's record (its key, baseline and claims: ADR 0014) and the uncommitted Log files each session
-claimed, the URLs in a text, an HTML page's text, a time in this machine's zone, and Claude Code's
-project folder for a checkout.
+and sections, heading anchors, slugs, dated names, git (and removing a folder git wrote in), the
+Log's root and its own files, the applications it records, the Target versions and the start
+record, a posting run's folder, a session's record (its key, baseline and claims: ADR 0014) and the
+uncommitted Log files each session claimed, the URLs in a text, an HTML page's text, a time in this
+machine's zone, and Claude Code's project folder for a checkout.
 
 A library, with no command line. A tool beside it imports it with
   sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # -I leaves this folder off sys.path
@@ -689,6 +689,36 @@ def set_default_branch(root, timeout=120):
     branch's name; None when the remote cannot say."""
     p = git_run(root, "remote", "set-head", "origin", "--auto", timeout=timeout)
     return default_branch(root) if p.returncode == 0 else None
+
+
+def rmtree(path):
+    """Remove the folder at path and all it holds, git's read-only object files too (Windows will
+    not delete a read-only file), taking a file or folder already gone (one a git process still
+    running there removed) as removed. The one copy: tests/test_logfiles.py's OneRmtree fails on
+    another (#24)."""
+    def retry(func, p, exc):
+        exc = exc[1] if isinstance(exc, tuple) else exc   # onerror's exc_info, onexc's exception
+        if isinstance(exc, FileNotFoundError):
+            return
+        try:
+            os.chmod(p, 0o700)
+            func(p)
+        except FileNotFoundError:
+            pass
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=retry)
+    else:   # onerror is deprecated from 3.12
+        shutil.rmtree(path, onerror=retry)
+
+
+def no_maintenance(repo):
+    """Turn git's automatic maintenance off in repo, a scratch repository a test or a tool removes
+    afterwards: a commit, a fetch or a push it receives starts `git maintenance run --auto`, which
+    detaches and can still be writing there (its maintenance.lock, a gc) when rmtree removes the
+    folder (#24). Call it right after `git init` or `git clone`. Not for a user's own repository: pass
+    `-c maintenance.auto=false -c gc.auto=0` to the one command there instead."""
+    for key, value in (("maintenance.auto", "false"), ("gc.auto", "0")):
+        git(repo, "config", key, value)
 
 
 def local_identity(root):

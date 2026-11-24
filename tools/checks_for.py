@@ -278,6 +278,10 @@ GROUPS = [
     ("tool guards", "template-scan.yml", ["tools/"], [
         py("tools/tests/test_logfiles.py"),
     ]),
+    # and those that scan maintainer/ too (OneRmtree), on a change to a maintainer tool or its tests
+    ("maintainer guards", "maintainer-guards.yml", ["maintainer/*.py", "maintainer/tests/"], [
+        py("tools/tests/test_logfiles.py"),
+    ]),
 ]
 
 
