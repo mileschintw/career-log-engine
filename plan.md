@@ -30,8 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | PR #45 open, waitchecks | — |
-| e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | started | #33 merges（GO #e22） |
+| e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | GO sent | — |
 
 **Main checkout:** none.
 
@@ -42,12 +41,11 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
 | #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；0.4.1 發出去後錯的 `stop:` 不會再出現，剩一個假設 |
-| #22 版本字串只定義一次 | 2 | none | after #33, `tools/tests/test_upgrade.py › Export` | `maintainer/devbuild.py`、`tools/tests/test_upgrade.py`、`maintainer/tests/test_devbuild.py` | 第一輪 lane e22，parked until #33 merges |
+| #22 版本字串只定義一次 | 1 | none | none | `maintainer/devbuild.py`、`tools/tests/test_upgrade.py`、`maintainer/tests/test_devbuild.py` | 第一輪 lane e22，GO（#33 已 merge） |
 | #24 一個 rmtree helper | — | none | none | 多個測試檔和 maintainer 工具 | 不排 lane：優先度低 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #33 匯出帶的檢查在 Template 和每個 Log 裡 fail（讀只在原始碼的檔） | 1 | none | none | `tools/skill_lint.py`、`tools/tests/test_skill_lint.py`、`test_logfiles.py › TableHelpers`、`test_checks_for.py › Typical`、`test_upgrade.py › Source／Export／NextGuide`、匯出用的 workflow 和它在 `checks_for.py` map 的項目 | 第一輪 lane e33 |
 | #37 升級模式：Sonnet 沒等使用者 yes 就走過 step 2 的計畫 | — | none | after #27, `skills/career-log/modes/upgrade.md › step 2` | `skills/career-log/modes/upgrade.md › step 2` | 不排 lane：needs-triage，e20 開的；等使用者 |
 
 ## Waiting for the user to be present

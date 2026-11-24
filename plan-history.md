@@ -42,3 +42,9 @@ PR #44（#32、#36）CI 過後依第一輪 merge right merge。確認 blank issu
 
 | e32 | pr | #32 #36 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | PR #44 open, waitchecks | — |
 
+## 第一輪 merge：e33（2026-11-23 16:20 -0800）
+
+PR #45（#33）CI 過後（新的 `template-checks` job 第一次跑也過）依第一輪 merge right merge；push run 在 369b5195 成功。送 GO #e22。Now 列：
+
+| e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | PR #45 open, waitchecks | — |
+
