@@ -5,7 +5,7 @@ nothing reaches GitHub.
 
   python3 -I maintainer/tests/test_devbuild.py
 """
-import ast, filecmp, glob, importlib.util, io, os, re, shutil, subprocess, sys, tarfile, tempfile, unittest, unittest.mock
+import filecmp, importlib.util, io, os, re, shutil, subprocess, sys, tarfile, tempfile, unittest, unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -56,58 +56,12 @@ class Numbers(unittest.TestCase):
         self.assertEqual(devbuild.latest_release(["v0.9.0", "v0.10.0", "v0.10.1-dev.3", "v0.2.0"]), "0.10.0")
         self.assertIsNone(devbuild.latest_release(["v0.4.1-dev.1", "main"]))
 
-    def test_the_forms_are_upgrades(self):
-        # #22: devbuild takes the forms from tools/upgrade.py; a form changed there changes here
-        forms = devbuild.upgrade.SEMVER, devbuild.upgrade.VERSION
-        try:
-            devbuild.upgrade.SEMVER = re.compile(r"^(\d+)\.(\d+)\Z")
-            devbuild.upgrade.VERSION = re.compile(r"^(\d+)\.(\d+)(?:\.(\d+))?(?:-dev\.([1-9]\d*))?\Z")
-            self.assertEqual(devbuild.release_tags(["v0.4", "v0.4.0"]), ["0.4"])
-        finally:
-            devbuild.upgrade.SEMVER, devbuild.upgrade.VERSION = forms
-
-
-class OneVersionForm(unittest.TestCase):
-    """#22: the forms of a version are tools/upgrade.py's SEMVER and VERSION. A regex of a version's form
-    in another tool or maintainer script fails, printing the file, the line and what to use instead;
-    tools/export-template.sh writes it in sh, held the same by tools/tests/test_upgrade.py's samples."""
-
-    # Three dot-separated digit runs (\d or [0-9], repeated or not, in groups or not), or a Dev build's
-    # -dev.<n>, in a regex's source
-    FORM = re.compile(r"(?:\\d|\[0-9\])[+*]?\)?\\\.\(?(?:\\d|\[0-9\])[+*]?\)?\\\.|-dev\\\.")
-
-    def scan(self, name, source):
-        """[(line, text)] for each string, docstrings aside, that holds a version form's regex."""
-        tree = ast.parse(source, name)
-        docs = {id(n.body[0].value) for n in ast.walk(tree)
-                if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                and n.body and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
-        lines = source.splitlines()
-        return [(n.lineno, lines[n.lineno - 1].strip()) for n in ast.walk(tree)
-                if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs
-                and self.FORM.search(n.value)]
-
-    def test_no_tool_writes_a_version_form_of_its_own(self):
-        found = []
-        for folder in ("tools", "maintainer"):
-            for path in sorted(glob.glob(os.path.join(REPO, folder, "*.py"))):
-                if os.path.normcase(path) == os.path.normcase(os.path.join(REPO, "tools", "upgrade.py")):
-                    continue
-                with open(path, encoding="utf-8") as f:
-                    for line, text in self.scan(path, f.read()):
-                        found.append("%s:%d: %s (use upgrade.SEMVER, upgrade.VERSION, upgrade.key)"
-                                     % (os.path.relpath(path, REPO), line, text))
-        self.assertEqual(found, [])
-
-    def test_the_guard_reads_each_copied_form(self):
-        copies = ['RELEASE = re.compile(r"^v(\\d+)\\.(\\d+)\\.(\\d+)$")',
-                  'want = re.compile(r"^v%s-dev\\.([1-9]\\d*)$" % re.escape(version))',
-                  'ok = re.match("[0-9]+\\\\.[0-9]+\\\\.[0-9]+", v)',
-                  'ok = re.match(r"\\d+\\.\\d+\\.\\d+", v)']
-        for copy in copies:
-            self.assertEqual(len(self.scan("copy.py", copy)), 1, copy)
-        self.assertEqual(self.scan("fine.py", '"""A docstring: (\\d+)\\.(\\d+)\\.(\\d+)."""\n'
-                                              'version += "-dev.%d" % n\nDATE = r"\\d{4}-\\d{2}-\\d{2}"\n'), [])
+    def test_reads_the_forms_from_upgrade(self):
+        # #22: devbuild takes the forms from tools/upgrade.py; a form changed there changes here.
+        # tools/tests/test_logfiles.py's OneVersionForm fails on a form written anywhere else
+        with unittest.mock.patch.object(devbuild.upgrade, "VERSION", re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?\Z")):
+            self.assertEqual(devbuild.release_tags(["v0.4.0", "v0.4.1-rc.2", "v0.4.1-dev.1"]), ["0.4.0"])
+            self.assertEqual(devbuild.dev_number(["v0.4.1-rc.2", "v0.4.1-dev.5"], "0.4.1"), 3)
 
 
 @unittest.skipUnless(shutil.which("sh") or os.name == "nt", "no sh to run tools/export-template.sh")

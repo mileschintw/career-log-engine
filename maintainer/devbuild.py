@@ -45,14 +45,15 @@ NO_CHANGE = "No Log format change yet."
 NEXT_GUIDE = "docs/upgrades/upgrade-next.md"
 
 
-def is_release_tag(name):
-    """Whether name is a release's tag: v and a release version (upgrade.SEMVER)."""
-    return name.startswith("v") and upgrade.SEMVER.match(name[1:]) is not None
+def tag_version(name):
+    """The version a tag v<version> names, a release's or a Dev build's (upgrade.VERSION); None for
+    any other name."""
+    return name[1:] if name.startswith("v") and upgrade.VERSION.match(name[1:]) else None
 
 
 def release_tags(names):
     """The version X.Y.Z of each release tag vX.Y.Z in names."""
-    return [n[1:] for n in names if is_release_tag(n)]
+    return [v for v in map(tag_version, names) if v and not upgrade.is_dev(v)]
 
 
 def latest_release(names):
@@ -83,15 +84,15 @@ def holds_format_change(root, source):
 
 def dev_number(tags, version):
     """One more than the highest n of the tags v<version>-dev.<n> in tags, 1 when there is none."""
-    builds = [t[1:] for t in tags if t.startswith("v") and upgrade.is_dev(t[1:])]
-    return max([upgrade.key(b)[4] for b in builds if b.split("-", 1)[0] == version], default=0) + 1
+    builds = [upgrade.VERSION.match(v).groups() for v in map(tag_version, tags) if v and upgrade.is_dev(v)]
+    return max([int(n) for *release, n in builds if ".".join(release) == version], default=0) + 1
 
 
 def bring_releases(dest, url, url_tags, dest_tags):
     """Fetch into dest each release tag vX.Y.Z of url that dest does not have, so that a Log can
     upgrade with dest as its one --url: the plan reads the releases and the Log's own version there
     (#19). A tag dest has already stays as it is. Returns the tags fetched."""
-    want = [n for n in url_tags if is_release_tag(n) and n not in dest_tags]
+    want = [n for n in ("v" + v for v in release_tags(url_tags)) if n not in dest_tags]
     if want:
         git(dest, "-c", "maintenance.auto=false", "-c", "gc.auto=0", "fetch", "-q", "--no-tags", url,
             *("refs/tags/%s:refs/tags/%s" % (n, n) for n in want))

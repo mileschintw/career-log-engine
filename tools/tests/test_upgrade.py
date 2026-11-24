@@ -679,7 +679,7 @@ class Upgrade(unittest.TestCase):
 
 # Sample versions, each with whether it is one: a release x.y.z, or a Dev build x.y.z-dev.<n> with n
 # from 1. upgrade.VERSION and the export's --version check each say the same (#22); maintainer/devbuild.py
-# takes upgrade.py's.
+# takes upgrade.py's, and tests/test_logfiles.py's OneVersionForm fails on a form written in another tool.
 VERSION_SAMPLES = [
     ("0.4.1", True), ("0.10.0", True), ("12.0.3", True),
     ("0.4.1-dev.1", True), ("0.4.1-dev.10", True), ("1.0.0-dev.123", True),
@@ -756,16 +756,16 @@ class Export(unittest.TestCase):
         self.assertIn("is not empty", out)
         return True
 
-    def disagreements(self, pattern, export):
+    def disagreements(self, pattern, export_verdicts):
         """(sample, is it a version, pattern's verdict, the export's) for each sample of VERSION_SAMPLES
-        either check gets wrong; export maps each sample to the export's verdict."""
-        return [(v, good, pattern.match(v) is not None, export[v]) for v, good in VERSION_SAMPLES
-                if (pattern.match(v) is not None, export[v]) != (good, good)]
+        either check gets wrong; export_verdicts maps each sample to the export's verdict."""
+        return [(v, good, pattern.match(v) is not None, export_verdicts[v]) for v, good in VERSION_SAMPLES
+                if (pattern.match(v) is not None, export_verdicts[v]) != (good, good)]
 
     def test_version_samples(self):
         # #22: one form of a version, written in tools/upgrade.py and in the export's --version check
-        export = {v: self.export_takes(v) for v, _ in VERSION_SAMPLES}
-        self.assertEqual(self.disagreements(upgrade.VERSION, export), [])
+        export_verdicts = {v: self.export_takes(v) for v, _ in VERSION_SAMPLES}
+        self.assertEqual(self.disagreements(upgrade.VERSION, export_verdicts), [])
 
     def test_version_samples_catch_a_check_that_disagrees(self):
         # a Dev build numbered from 0, planted in the export's check alone, fails the table
@@ -775,14 +775,14 @@ class Export(unittest.TestCase):
         self.assertIn(r"-dev\.[1-9][0-9]*'", text)
         with open(script, "w", encoding="utf-8", newline="") as f:
             f.write(text.replace(r"-dev\.[1-9][0-9]*'", r"-dev\.[0-9]+'"))
-        export = {v: self.export_takes(v) for v, _ in VERSION_SAMPLES}
-        self.assertEqual(self.disagreements(upgrade.VERSION, export),
+        export_verdicts = {v: self.export_takes(v) for v, _ in VERSION_SAMPLES}
+        self.assertEqual(self.disagreements(upgrade.VERSION, export_verdicts),
                          [("0.4.1-dev.0", False, False, True), ("0.4.1-dev.01", False, False, True)])
         # and upgrade.VERSION as it was before #22, with the export's own verdicts right: its $ takes a
         # final newline, and its \d takes any script's digits
-        export = {v: good for v, good in VERSION_SAMPLES}
+        export_verdicts = {v: good for v, good in VERSION_SAMPLES}
         before = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-dev\.([1-9]\d*))?$")
-        self.assertEqual(self.disagreements(before, export),
+        self.assertEqual(self.disagreements(before, export_verdicts),
                          [("0.4.1\n", False, True, False), ("١.٢.٣", False, True, False)])
 
     def next_guide(self, change):
