@@ -110,9 +110,9 @@ once stories/ holds a Talking points file. A step that needs a target the Log ca
 after the mode that leaves one (fit after scan-results, write after fit; interview never); nor does a mode with no
 fixed next step, or one that ends its flow. After consolidate, also a `Next:` line naming `audit` for each Target
 version whose stale count (tools/application.py stale: its two lists added together) is 3 or more now, with
-its entries (the first three named, the rest counted), once a week at most: it shows when no consolidate or log
-run since the save showed it this week, read from git (stale_nexts). After write, for an
-application folder saved since `mode start` without archived.md, from the family and tier `application.py start`
+its entries (the first three named, the rest counted), on the first consolidate or log run that finds it there
+and then on the first one of each later week, counted in 7-day steps from the save's commit (stale_nexts).
+After write, for an application folder saved since `mode start` without archived.md, from the family and tier `application.py start`
 recorded in its draft folder: a `Next:` line for a target run that updates the family's Target version with the
 Past phrasings bullets the save added that it lacks (none added: no line), or, when the family has no Target
 version yet, one that creates it from the application's resume; and a `Next:` line for setup when the role is
@@ -1529,8 +1529,9 @@ def stale_nexts(root, guide, base, example=True):
     <base> whose subject starts with one of STALE_RUNS (consolidate and log, whose Next up holds the
     line); a week is STALE_WEEK counted from the save's commit. It shows when no such run exists, when
     that run's count was below STALE_AT (the run that crosses it, or the first one after another mode
-    did), or when this run's last commit is in a later week than that run's: once a week at most,
-    read from git, with no stored state. None when <base> is None. example=False leaves out audit's
+    did), or when this run's last commit is in a later week than that run's: the first run of each
+    week, read from commit times, with no stored state. A run that made no commit is not seen, so the
+    next one shows it again. None when <base> is None. example=False leaves out audit's
     English request to say, for a sentence the agent words itself."""
     if base is None:
         return []
