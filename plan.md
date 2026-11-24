@@ -46,6 +46,7 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
 | #49 升級模式：Sonnet 在 step 5 摘要重複 Dev build 警告 | — | none | none | `skills/career-log/modes/upgrade.md › step 5` | 不排 lane：needs-triage，e37 開的；第二輪 fix 要使用者同意 |
+| #52 maintainer 工具 import `tools/logfiles.py`，但 coord／dev build／prepush 群組和 `coord-tests.yml` 沒列 | — | none | none | `tools/checks_for.py › GROUPS`、`coord-tests.yml › paths:` | 不排 lane：e24 開的；e24 merge 後才成立，下一輪 |
 
 ## Waiting for the user to be present
 
