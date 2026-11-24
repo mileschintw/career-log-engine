@@ -31,7 +31,6 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
 | e33 | pr | #33 | local_abb44ce2-5b42-4ddf-974a-5208f544844d（落在已 archive 的 `.claude/worktrees/lane-e18-c7297e`，分支 `claude/lane-e33-*`） | started | — |
-| e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | PR #43 open, waitchecks | — |
 | e32 | pr | #32 #36 | local_0da5bc93-857e-49fc-86d7-73b77172a54b（卡片；`.claude/worktrees/objective-yalow-5e2d4c`，分支 `claude/objective-yalow-5e2d4c`） | PR #44 open, waitchecks | — |
 | e22 | pr | #22 | local_496ef204-860b-447d-9383-905d0c9f9661（卡片；`.claude/worktrees/jovial-kapitsa-a8f724`，分支 `claude/jovial-kapitsa-a8f724`） | started | #33 merges（GO #e22） |
 
@@ -44,7 +43,6 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
 | #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；0.4.1 發出去後錯的 `stop:` 不會再出現，剩一個假設 |
-| #20 既有 Log 升級後 front page 的 Upstream／Upgrade 兩段是舊文字 | 1 | none | none | `tools/upgrade.py`、`modes/upgrade.md` | 第一輪 lane e20 |
 | #22 版本字串只定義一次 | 2 | none | after #33, `tools/tests/test_upgrade.py › Export` | `maintainer/devbuild.py`、`tools/tests/test_upgrade.py`、`maintainer/tests/test_devbuild.py` | 第一輪 lane e22，parked until #33 merges |
 | #24 一個 rmtree helper | — | none | none | 多個測試檔和 maintainer 工具 | 不排 lane：優先度低 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage |

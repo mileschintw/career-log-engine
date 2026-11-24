@@ -30,3 +30,9 @@ PR #42（#23）CI 過後依第一輪 merge right merge。Now 列：
 
 | e23 | pr | #23 | local_a4f94a65-33f2-4e28-b6e1-0f9bb83fd226（落在已 archive 的 `.claude/worktrees/lane-825-379001`，分支 `claude/lane-e23-*`） | started | — |
 
+## 第一輪 merge：e20（2026-11-23 16:00 -0800）
+
+PR #43（#20）CI 過後依第一輪 merge right merge；push run 在 acfcdcc5 成功。使用者在 e20 的 session picked「沒改過換、改過問」。Now 列：
+
+| e20 | pr | #20 | local_bbf40246-872b-40df-b77c-682c478b5ee5（落在已 archive 的 `.claude/worktrees/lane-e8-2d4a83`，分支 `claude/lane-e20-*`） | PR #43 open, waitchecks | — |
+
