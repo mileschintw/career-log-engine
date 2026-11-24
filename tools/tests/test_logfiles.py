@@ -288,8 +288,9 @@ class Files(unittest.TestCase):
 class Git(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.root, True)
+        self.addCleanup(logfiles.rmtree, self.root)
         self.run_git("init", "-q", "-b", "main")
+        logfiles.no_maintenance(self.root)   # it commits and pushes: no maintenance left running at cleanup
 
     def run_git(self, *args, cwd=None):
         subprocess.run(["git", "-C", cwd or self.root] + list(args), check=True, capture_output=True)
@@ -342,8 +343,9 @@ class Git(unittest.TestCase):
         self.assertIsNone(logfiles.default_branch(self.root))
         self.assertIsNone(logfiles.set_default_branch(self.root))   # no origin
         remote = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, remote, True)
+        self.addCleanup(logfiles.rmtree, remote)
         self.run_git("init", "-q", "--bare", "-b", "trunk", cwd=remote)
+        logfiles.no_maintenance(remote)   # it receives a push
         self.run_git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty",
                      "-m", "x")
         self.run_git("remote", "add", "origin", remote)
@@ -1105,7 +1107,8 @@ class OneRmtree(unittest.TestCase):
         for rel, source in py_sources("tools", "skills", "maintainer"):
             found = hand_rmtrees(source)
             if rel == "tools/logfiles.py":
-                self.assertEqual(len(found), 3, "tools/logfiles.py defines rmtree once, with its two calls")
+                if len(found) != 3:
+                    fails.append("tools/logfiles.py: rmtree is defined there once, with its two calls; found %r" % found)
                 continue
             fails += ["%s:%d: rmtree by hand: %s" % (rel, line, text) for line, text in found]
         self.assertEqual(fails, [], "\n" + "\n".join(fails) + "\nCall logfiles.rmtree(path) to remove a folder "

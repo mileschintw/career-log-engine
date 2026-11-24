@@ -580,7 +580,7 @@ class CopyBase(unittest.TestCase):
         remote = self.copy + "-remote.git"
         if not os.path.isdir(remote):
             subprocess.run(["git", "init", "-q", "--bare", "-b", branch, remote], check=True, capture_output=True)
-            self.addCleanup(shutil.rmtree, remote, True)
+            self.addCleanup(check_run.logfiles.rmtree, remote)
             check_run.logfiles.no_maintenance(remote)   # it receives a push
             self.git("remote", "add", "origin", remote)
         self.git("push", "-q", "-f", "origin", "HEAD:" + branch)
