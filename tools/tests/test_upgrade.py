@@ -26,6 +26,9 @@ spec.loader.exec_module(upgrade)
 spec = importlib.util.spec_from_file_location("logfiles", os.path.join(TOOLS, "logfiles.py"))
 logfiles = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(logfiles)
+spec = importlib.util.spec_from_file_location("checks_for", os.path.join(TOOLS, "checks_for.py"))
+checks_for = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(checks_for)
 
 ALLOW = 'ALLOW="skills tools AGENTS.md .gitignore"\n'
 OLD_SHA = "e6a5565a4807db1ab30b0eb70f8c2fd1421ac4df"
@@ -884,7 +887,10 @@ def migrated_log(tmp):
     """A Log in this source's formats, so one the pending guide has nothing left to migrate in: the
     export of HEAD, setup's config.toml and an entry with a Story, written by the export's own tools."""
     out = os.path.join(tmp, "export")
-    r = subprocess.run(["sh", "tools/export-template.sh", out], cwd=REPO, capture_output=True,
+    sh, env = checks_for.find_sh()   # Git for Windows' own when PATH has no sh
+    if not sh:
+        raise unittest.SkipTest("no sh to run tools/export-template.sh")
+    r = subprocess.run([sh, "tools/export-template.sh", out], cwd=REPO, env=env, capture_output=True,
                        encoding="utf-8", errors="replace")
     if r.returncode != 0:
         raise AssertionError("export failed:\n" + r.stdout + r.stderr)
