@@ -5,7 +5,7 @@
   python3 -I tools/entries.py check [--consolidated <entry>...]
   python3 -I tools/entries.py refs <entry>
   python3 -I tools/entries.py links-since <entry>
-  python3 -I tools/entries.py rulings-hits
+  python3 -I tools/entries.py rulings-hits [<entry>...]
 
 (Windows: py -3 -I.) Every subcommand takes --root <root>, the Log's root, by default the folder
 above this script's. <entry> is an entry's path, relative to <root> (`entries/2031-04-widget.md`)
@@ -164,6 +164,13 @@ entry is over the threshold at more than THRESHOLD tokens, half of what Read ret
     unit; a `## Risks...` section is not read. Only quoted wordings are matched: a pair with no hit can
     still state the ruled-out claim in other words;
   - `OK: <n> outputs, <n> rulings, <n> pairs, <n> hits`. Exit 0.
+  With `<entry>...` (the end of a mode that wrote or changed those entries' `## Conflicts` rulings,
+  SKILL.md › Rulings a run changed), it reads only those entries' rulings, against the outputs not
+  yet sent: the targets and the reports that are not Archived. Application folders (write freezes a
+  folder once it is sent, and the Log records no send) and Archived reports are left for audit. It
+  prints each `ruling:` line, a `check:` line only for a pair with a `wrong` or `do-not-use` hit,
+  listing those hits alone, then `left out: <n> sent outputs ...` when there are any, and `OK: <n>
+  outputs, <n> rulings, <n> hits`. Exit 0.
 
 Writes, and `state`, which reads what the modes decide on (each write edits in place and leaves
 every other byte of the file as it was, its byte order mark and line ends included):
@@ -1569,19 +1576,52 @@ def quote_pattern(q):
     return (r"(?<![a-z0-9])" if edge(q[0]) else "") + body + (r"(?![a-z0-9])" if edge(q[-1]) else "")
 
 
-def cmd_rulings_hits(root):
+SCOPED_SIDES = ("wrong", "do-not-use")   # the hits a scoped run reports: a wording the ruling rules out
+
+
+def is_sent(root, name):
+    """Whether an output of outputs() is frozen once sent, so a scoped rulings-hits leaves it to audit:
+    an application folder (the Log records no send, and write freezes a folder once the user sends
+    it) or an Archived report (write › Save levels)."""
+    if name.startswith("outputs/applications/"):
+        return True
+    if name.startswith("outputs/reports/"):
+        import check_save   # it imports this module: imported here, not at the top
+        try:
+            return check_save.report_marks(read(os.path.join(root, name)))[1]
+        except (OSError, UnicodeDecodeError):
+            return False
+    return False
+
+
+def cmd_rulings_hits(root, scope=None):
+    """rulings-hits; with scope (entry paths), only those entries' rulings, against the outputs not
+    yet sent, reporting their wrong and do-not-use hits."""
     entries = load(root)
-    found = rulings(root, entries)
+    found = rulings(root, [e for p in scope for e in entries if e.path == p] if scope is not None else entries)
+    if scope is not None:
+        found = [r for r in found if r[0] != "profile.md"]
     for path, n, line in found:
         print("ruling: %s:%d: %s" % (path, n, line))
     quotes = [ruling_quotes(line) for _, _, line in found]
     pairs = hits = 0
     outs = outputs(root)
+    if scope is not None:
+        sent = [o for o in outs if is_sent(root, o[0])]
+        outs = [o for o in outs if o not in sent]
     for name, prov, files in outs:
         texts = {f: output_text(root, f) for f in files}
         for f in [f for f, t in texts.items() if t[0] is None]:
-            print("unreadable: %s (not UTF-8 text: read it yourself against every ruling)" % f)
+            if scope is None:
+                print("unreadable: %s (not UTF-8 text: read it yourself against every ruling)" % f)
             del texts[f]
+        if scope is not None:
+            for k, (path, n, _) in enumerate(found):
+                found_hits = scoped_hits(texts, quotes[k])
+                hits += len(found_hits)
+                if found_hits:
+                    print("check: %s against %s:%d%s" % (name, path, n, "".join("; " + h for h in found_hits)))
+            continue
         named, unresolved = set(), []
         prov_text = None
         if prov and os.path.isfile(os.path.join(root, prov)):
@@ -1596,26 +1636,44 @@ def cmd_rulings_hits(root):
         for n, cell in unresolved:
             print("unresolved: %s:%d: %s" % (prov, n, cell))
         for k, (path, n, _) in enumerate(found):
-            found_hits = []
-            spans = {f: [] for f in texts}   # the right side's matches, which hold a wrong side's text
-            for side, raw, q in sorted(quotes[k], key=lambda t: t[0] != "right"):
-                if len(q) < 2:
-                    continue
-                for f, (joined, starts) in texts.items():
-                    matches = list(re.finditer(quote_pattern(q), joined))
-                    if side == "right":
-                        spans[f] += [m.span() for m in matches]
-                    else:
-                        matches = [m for m in matches if not any(a <= m.start() and m.end() <= b for a, b in spans[f])]
-                    if matches:
-                        line = max(i for i, s in enumerate(starts, 1) if s <= matches[0].start())
-                        found_hits.append('hit %s %s:%d "%s"' % (side, f, line, raw))
+            found_hits = [h for _, h in ruling_hits(texts, quotes[k])]
             if path in named or path == "profile.md" or found_hits:
                 pairs += 1
                 hits += len(found_hits)
                 print("check: %s against %s:%d%s" % (name, path, n, "".join("; " + h for h in found_hits)))
+    if scope is not None:
+        if sent:
+            print("left out: %d sent outputs (application folders and Archived reports, frozen once sent): audit"
+                  " reads them" % len(sent))
+        print("OK: %d outputs, %d rulings, %d hits" % (len(outs), len(found), hits))
+        return 0
     print("OK: %d outputs, %d rulings, %d pairs, %d hits" % (len(outs), len(found), pairs, hits))
     return 0
+
+
+def ruling_hits(texts, quotes):
+    """[(side, `hit <side> <file>:<line> "<quote>"`)] of one ruling's quoted wordings (ruling_quotes) in
+    an output's texts ({file: output_text}); a wrong side inside a right side's match is left out."""
+    out = []
+    spans = {f: [] for f in texts}   # the right side's matches, which hold a wrong side's text
+    for side, raw, q in sorted(quotes, key=lambda t: t[0] != "right"):
+        if len(q) < 2:
+            continue
+        for f, (joined, starts) in texts.items():
+            matches = list(re.finditer(quote_pattern(q), joined))
+            if side == "right":
+                spans[f] += [m.span() for m in matches]
+            else:
+                matches = [m for m in matches if not any(a <= m.start() and m.end() <= b for a, b in spans[f])]
+            if matches:
+                line = max(i for i, s in enumerate(starts, 1) if s <= matches[0].start())
+                out.append((side, 'hit %s %s:%d "%s"' % (side, f, line, raw)))
+    return out
+
+
+def scoped_hits(texts, quotes):
+    """The hit texts of ruling_hits whose side a scoped run reports (SCOPED_SIDES)."""
+    return [h for side, h in ruling_hits(texts, quotes) if side in SCOPED_SIDES]
 
 
 # ---- Stories ----
@@ -4560,13 +4618,13 @@ FLAGS = {   # each subcommand's flags; --root is every one's
     "state": {"--today"}, "pending-add": {"--today"}, "period": {"--cover", "--ongoing"},
     "set-visibility": {"--source", "--today"}, "phrasing-add": {"--angle", "--source", "--distinct", "--replace"},
     "split": {"--phase", "--cut", "--undo", "--today"}, "diff": {"--paste", "--review"}, "drop": {"--reason", "--today"}}
-TAKES = {"list": 0, "rulings-hits": 0, "story-coverage": 0, "story-wordings": 0, "readme": 0, "refs": 1,
+TAKES = {"list": 0, "rulings-hits": None, "story-coverage": 0, "story-wordings": 0, "readme": 0, "refs": 1,
          "links-since": 1, "story-candidates": 1, "story-stale": 1, "story-finish": 1, "new": 1, "set-status": 2,
          "period": 1, "story-wording-add": 2, "phrasing-add": 2, "pending-add": 2, "set-visibility": 2,
          "story-type-add": 1, "story-add": 2, "story-name": 3, "story-core": 2, "story-confirm": 1, "answer-row": 1,
          "answer-row-add": 1, "answer-set": 2, "drop": 1,
          "check": None, "state": None, "split": None, "diff": None, "story-leads": None, "story-card": None}
-# None: check takes entries with --consolidated only, state any number, split and diff one or more,
+# None: check takes entries with --consolidated only, state and rulings-hits any number, split and diff one or more,
 # story-leads a pack with --check only, story-card a card with --check or --confirm only
 FREE_TEXT = ("story-wording-add", "phrasing-add", "pending-add")   # their text may follow `--`
 
@@ -4624,7 +4682,7 @@ def main(argv):
     logfiles.utf8_stdout()
     usage = ("usage: %s -I tools/entries.py [--root <root>] list [--series <slug> [--date YYYY-MM-DD]]"
              " [--window <years>] [--course-work] |"
-             " check [--consolidated <entry>...] | refs <entry> | links-since <entry> | rulings-hits |"
+             " check [--consolidated <entry>...] | refs <entry> | links-since <entry> | rulings-hits [<entry>...] |"
              " new <slug> --month YYYY-MM --status stub|imported --field title=<title> --field period=<period>"
              " [--field <name>=<value>]... [--field-source <name>=<source>]... | readme | set-status <entry> <status> |"
              " state [<entry>...] | pending-add <entry> <text> |"
@@ -4736,7 +4794,7 @@ def main(argv):
         if cmd == "check":
             return cmd_check(root, today, [entry_arg(root, a) for a in rest] if consolidated else None)
         if cmd == "rulings-hits":
-            return cmd_rulings_hits(root)
+            return cmd_rulings_hits(root, [entry_arg(root, a) for a in rest] if rest else None)
         if cmd == "story-coverage":
             if "--interviewers" in opts and not re.fullmatch(r"[1-9][0-9]*", opts["--interviewers"]):
                 return bad("--interviewers takes a whole number, 1 or more: the stage's interviewers")

@@ -652,6 +652,67 @@ class RulingsHitsTest(Log):
                       " outputs/resumes/general.md:4 \"lamp\"", lines)
         self.assertIn("check: outputs/resumes/general against %s:21" % W_PATH, lines)   # "Sorter", a run of its title
 
+    # ---- scoped to the entries a run changed (#28) ----
+
+    def scoped_outputs(self):
+        """A target, a Reference report, an Archived report and an application folder, each using
+        Widget's wrong and do-not-use sides, a context and a right wording, and Lamp's right side."""
+        text = "Made it 2-10x faster, more throughput, deadlock-free, 820 ms; a lamp.\n"
+        self.write("outputs/resumes/backend.md", "# Backend\n\n| Claim | Entry section | Source |\n|---|---|---|\n"
+                   "| speed | Widget Sorter › Results | src |\n")
+        self.write("outputs/resumes/backend.tex", "\\item " + text)
+        self.write("outputs/reports/2031-01-02-bio.md", "# Bio\n\nKind: bio\n\n" + text)
+        self.write("outputs/reports/2031-01-03-bullets.md", "# Bullets\n\nKind: resume bullets\n"
+                   "Archived (user, 2031-01-04)\n\n- " + text)
+        self.write("outputs/applications/2031-02-01-acme-swe/provenance.md",
+                   "| Claim | Entry | Source |\n|---|---|---|\n| speed | entries/2031-01-widget.md › Results | src |\n")
+        self.write("outputs/applications/2031-02-01-acme-swe/resume.tex", "\\item " + text)
+
+    def test_scoped_to_the_given_entries_in_unsent_outputs(self):
+        self.scoped_outputs()
+        code, lines = self.run_tool("rulings-hits", W_PATH, "--root", self.root)
+        self.assertEqual(code, 0)
+        self.assertEqual(lines, [
+            "ruling: %s:21: Settled: use \"2–10x faster\", not \"throughput\" (wall-clock runs, not \"rate\"). (src)" % W_PATH,
+            "ruling: %s:22: Settled: use \"deadlock-free\" for resumes, \"deadlock-free but not starvation-free\" for"
+            " interviews (hot keys). (src)" % W_PATH,
+            "ruling: %s:23: Settled: do not use \"820 ms\" (no run shows it). (src)" % W_PATH,
+            # only wrong and do-not-use hits; the right and context ones, Lamp's and profile.md's are audit's
+            "check: outputs/resumes/backend against %s:21; hit wrong outputs/resumes/backend.tex:1 \"throughput\"" % W_PATH,
+            "check: outputs/resumes/backend against %s:23; hit do-not-use outputs/resumes/backend.tex:1 \"820 ms\"" % W_PATH,
+            "check: outputs/reports/2031-01-02-bio.md against %s:21; hit wrong outputs/reports/2031-01-02-bio.md:5"
+            " \"throughput\"" % W_PATH,
+            "check: outputs/reports/2031-01-02-bio.md against %s:23; hit do-not-use outputs/reports/2031-01-02-bio.md:5"
+            " \"820 ms\"" % W_PATH,
+            "left out: 2 sent outputs (application folders and Archived reports, frozen once sent): audit reads them",
+            "OK: 2 outputs, 3 rulings, 4 hits"])
+
+    def test_scoped_to_an_entry_with_no_hit(self):
+        self.scoped_outputs()
+        code, lines = self.run_tool("rulings-hits", "entries/2031-02-lamp.md", "--root", self.root)
+        self.assertEqual(code, 0)
+        self.assertEqual(lines, [   # a right side only: nothing to report
+            "ruling: entries/2031-02-lamp.md:20: Settled: both \"lamp\" and \"light\" are right (same). (src)",
+            "left out: 2 sent outputs (application folders and Archived reports, frozen once sent): audit reads them",
+            "OK: 2 outputs, 1 rulings, 0 hits"])
+
+    def test_scoped_to_several_entries_and_none_with_rulings(self):
+        self.write("entries/2031-03-bare.md", entry(title="Bare"))
+        self.write("outputs/resumes/backend.tex", "\\item 820 ms\n")
+        code, lines = self.run_tool("rulings-hits", "entries/2031-03-bare.md", "--root", self.root)
+        self.assertEqual((code, lines), (0, ["OK: 1 outputs, 0 rulings, 0 hits"]))
+        code, lines = self.run_tool("rulings-hits", "entries/2031-02-lamp.md", W_PATH, "--root", self.root)
+        self.assertEqual(code, 0)
+        self.assertEqual([l.split(":")[0] + ":" + l.split(":")[1] for l in lines if l.startswith("ruling:")],
+                         ["ruling: entries/2031-02-lamp.md", "ruling: %s" % W_PATH] + ["ruling: %s" % W_PATH] * 2)
+        self.assertIn("check: outputs/resumes/backend against %s:23; hit do-not-use outputs/resumes/backend.tex:1"
+                      " \"820 ms\"" % W_PATH, lines)
+
+    def test_scoped_takes_entries_only(self):
+        code, lines = self.run_tool("rulings-hits", "profile.md", "--root", self.root)
+        self.assertEqual(code, 2)
+        self.assertTrue(lines[0].startswith("FAIL: not an entry of"), lines)
+
 
 class RefsTest(Log):
     def test_refs(self):
