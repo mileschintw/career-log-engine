@@ -15,7 +15,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** none（第一輪的已結束，在 `plan-history.md`〈第一輪結束〉）
+- **Merge right:** 2026-11-23 17:22 -0800，使用者 picked「開工，CI 過就 merge」（問題：照提案開第二輪的 3 條 lane 嗎？）：lanes e46、e37、e24。
 - **Unattended log:** none
 
 ## Rulings
@@ -40,12 +40,13 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
 | #17 升級模式：Log 在比最新 release 新的 Dev build 上時跟著舊 release 的工具走 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；0.4.1 發出去後錯的 `stop:` 不會再出現，剩一個假設 |
-| #24 一個 rmtree helper | — | none | none | 多個測試檔和 maintainer 工具 | 不排 lane：優先度低 |
+| #24 一個 rmtree helper | 1 | none | none | 多個測試檔和 maintainer 工具 | 第二輪 lane e24 |
 | #28 Output 對 entry 的檢查只在 audit 跑 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage |
 | #29 Harness：這個 repo 沒有 Log，agent case 的 copy 要有 Log 來源 | — | none | none | 缺 Files 節 | 不排 lane：needs-triage；決定之前 agent case 用 `template-copy`＋fixture |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #37 升級模式：Sonnet 沒等使用者 yes 就走過 step 2 的計畫 | — | none | after #27, `skills/career-log/modes/upgrade.md › step 2` | `skills/career-log/modes/upgrade.md › step 2` | 不排 lane：needs-triage，e20 開的；等使用者 |
-| #46 `maintainer/*.py` 的 guard 不是每個 maintainer 工具都跑 | — | none | after #22, `maintainer/tests/test_devbuild.py › OneVersionForm`（如果搬） | `coord-tests.yml › paths:`、`tools/checks_for.py › GROUPS` 的 `coord`／`dev build` | 不排 lane：needs-triage，e22 開的；也涵蓋 e32 報告問的「每個 maintainer/*.py 都在 coord 群組的測試」；等使用者 |
+| #37 升級模式：Sonnet 沒等使用者 yes 就走過 step 2 的計畫 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 2` | 第二輪 lane e37 |
+| #46 `maintainer/*.py` 的 guard 不是每個 maintainer 工具都跑 | 1 | none | none | `coord-tests.yml › paths:`、`tools/checks_for.py › GROUPS` 的 `coord`／`dev build` | 第二輪 lane e46 |
+| #48 升級模式：Dev build 警告在 step 1 和 step 2 各說一次 | 1 | none | none | `skills/career-log/modes/upgrade.md › step 1` | 第二輪 lane e37（和 #37 一起） |
 
 ## Waiting for the user to be present
 
@@ -53,7 +54,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第二輪提案（since 2026-11-23 17:18 -0800）：** e46（#46，triage 成 ready-for-agent）、e37（#37 triage，加一張新 issue：拿掉 step 1 的 Dev build 警告，e27 的建議，併進同一條 lane）、e24（#24）三條並行；問開工和 merge right。
+- **第二輪（2026-11-23 17:22 -0800）：** 使用者說開工。#37、#46 triage 成 ready-for-agent，開了 #48（step 1 的 Dev build 警告，併進 e37）。
 - **Log 升到最新 Dev build 的 prompt（since 2026-11-23 17:18 -0800）：** 要不要寫到私人記錄。
 
 ## Deadlines
