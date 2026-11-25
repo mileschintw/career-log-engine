@@ -109,9 +109,10 @@ work is done is skipped: import once there are entries, consolidate once no entr
 once stories/ holds a Talking points file. A step that needs a target the Log cannot name gets no line except right
 after the mode that leaves one (fit after scan-results, write after fit; interview never); nor does a mode with no
 fixed next step, or one that ends its flow. After consolidate, also a `Next:` line naming `audit` for each Target
-version whose stale count (tools/application.py stale: its two lists added together) is 3 or more now and was
-below 3 at `mode start`, with its entries: it shows once, on the run that crosses 3. After write, for an
-application folder saved since `mode start` without archived.md, from the family and tier `application.py start`
+version whose stale count (tools/application.py stale: its two lists added together) is 3 or more now, with
+its entries (the first three named, the rest counted), on the first consolidate or log run that finds it there
+and then on the first one of each later week, counted in 7-day steps from the save's commit (stale_nexts).
+After write, for an application folder saved since `mode start` without archived.md, from the family and tier `application.py start`
 recorded in its draft folder: a `Next:` line for a target run that updates the family's Target version with the
 Past phrasings bullets the save added that it lacks (none added: no line), or, when the family has no Target
 version yet, one that creates it from the application's resume; and a `Next:` line for setup when the role is
@@ -1516,19 +1517,26 @@ def entry_titles(root):
     return {e.path: app.one_line(entries.one_value(e.fields.get("title"))) or e.slug for e in entries.load(root)}
 
 
-STALE_AT = 3   # a Target version's stale count that gets a Next line, on the run that crosses it (#612)
+STALE_AT = 3   # a Target version's stale count that gets a Next line (#612)
+STALE_WEEK = 7 * 86400   # while it stays there, the line shows again on a week's first run (#28)
+STALE_RUNS = ("consolidate(", "log(")   # the commit subjects of the runs whose Next up holds the line
 
 
 def stale_nexts(root, guide, base, example=True):
     """A Next line for each Target version whose stale count (its two staleness lists added together,
-    tools/application.py stale) is STALE_AT or more now and was below it at commit <base>, the run's
-    start: it appears once, on the run that crosses, with no stored state. None when <base> is None.
-    example=False leaves out audit's English request to say, for a sentence the agent words itself."""
+    tools/application.py stale) is STALE_AT or more now, on the run whose start is commit <base>, when
+    no earlier run showed it this week. The earlier run is the last commit after the save and up to
+    <base> whose subject starts with one of STALE_RUNS (consolidate and log, whose Next up holds the
+    line); a week is STALE_WEEK counted from the save's commit. It shows when no such run exists, when
+    that run's count was below STALE_AT (the run that crosses it, or the first one after another mode
+    did), or when this run's last commit is in a later week than that run's: the first run of each
+    week, read from commit times, with no stored state. A run that made no commit is not seen, so the
+    next one shows it again. None when <base> is None. example=False leaves out audit's
+    English request to say, for a sentence the agent words itself."""
     if base is None:
         return []
     app = tools_module("application")
     titles = entry_titles(root)
-    held = set((git_out(root, "ls-tree", "-r", "-z", "--name-only", base, "--", "entries/") or "").split("\0"))
     said = guide.said("audit", example)
     out = []
     for name in logfiles.targets(root):
@@ -1536,19 +1544,34 @@ def stale_nexts(root, guide, base, example=True):
             res = app.stale(root, name)
         except app.AppError:
             continue
-        if not res or git_out(root, "merge-base", "--is-ancestor", res["saved"][0], base) is None:
+        saved = res and res["saved"][0]
+        if not saved or git_out(root, "merge-base", "--is-ancestor", saved, base) is None:
             continue   # not saved, saved during this run, or <base> is not in this Log: nothing to compare
-        since_save = "%s..%s" % (res["saved"][0], base)
-        # (entry, how it is behind, whether it already was at <base>)
-        behind = [(path, "changed", bool(git_out(root, "log", "-1", "--format=%h", since_save, "--", path)))
-                  for path, _, _ in res["changed"]]
-        behind += [(path, "new", path in held and not untracked) for path, _, untracked in res["new"]]
-        if not len(behind) >= STALE_AT > sum(was for *_, was in behind):
+        behind = [(path, "changed") for path, _, _ in res["changed"]] + [(path, "new") for path, _, _ in res["new"]]
+        if len(behind) < STALE_AT:
             continue
-        out.append("Next: %s. Target version `%s` has %d entries behind its last save: %s. It decides whether to"
-                   " refresh the Target version." % (said, name, len(behind), ", ".join(
-                       "%s (%s, %s)" % (titles.get(path, path), path, how) for path, how, _ in behind)))
+        commits = (git_out(root, "log", "--format=%H %ct %s", "%s..%s" % (saved, base)) or "").splitlines()
+        # the last earlier run whose Next up held the line: (sha, commit time)
+        last = next(((sha, int(when)) for sha, when, subject in (c.split(" ", 2) for c in commits if c.count(" ") >= 2)
+                     if subject.startswith(STALE_RUNS)), None)
+        if last and behind_at(root, res, saved, last[0]) >= STALE_AT:
+            week = lambda when: (when - int(git_out(root, "log", "-1", "--format=%ct", saved))) // STALE_WEEK
+            if week(int(git_out(root, "log", "-1", "--format=%ct", "HEAD"))) <= week(last[1]):
+                continue   # a run showed it this week already
+        named = ", ".join("%s (%s, %s)" % (titles.get(path, path), path, how) for path, how in behind[:NAMED])
+        more = " and %d more" % (len(behind) - NAMED) if len(behind) > NAMED else ""
+        out.append("Next: %s. Target version `%s` has %d entries behind its last save: %s%s. It decides whether to"
+                   " refresh the Target version." % (said, name, len(behind), named, more))
     return out
+
+
+def behind_at(root, res, saved, commit):
+    """A Target version's stale count at <commit>, from application.py stale's result <res> now: its
+    cited entries changed between the save and <commit>, and its new entries already there."""
+    held = set((git_out(root, "ls-tree", "-r", "-z", "--name-only", commit, "--", "entries/") or "").split("\0"))
+    since_save = "%s..%s" % (saved, commit)
+    return (sum(bool(git_out(root, "log", "-1", "--format=%h", since_save, "--", path)) for path, _, _ in res["changed"])
+            + sum(path in held and not untracked for path, _, untracked in res["new"]))
 
 
 def added_phrasings(root, base, cite):
