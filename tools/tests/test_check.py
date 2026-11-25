@@ -2219,14 +2219,17 @@ class SessionTest(unittest.TestCase):
         self.write("entries/2031-01-widget.md", "---\ntitle: Widget\nperiod: 2031-01\nstatus: consolidated\n---\n\n"
                                                 "# Widget\n\nMore.\n")
         self.git("commit", "-qam", "log(widget): result")
-        added = []
+        added, now = [], int(time.time())
 
-        def add():
+        def add(days=0, subject="log(part%d): start"):
+            """One more entry, committed <days> after the save under <subject> (%d: its number)."""
             n = len(added) + 2
             self.write("entries/2032-0%d-part%d.md" % (n, n),
                        "---\ntitle: Part %d\nperiod: 2032-0%d\nstatus: consolidated\n---\n\n# Part %d\n" % (n, n, n))
             self.git("add", "-A")
-            self.git("commit", "-qm", "log(part%d): start" % n)
+            when = "%d +0000" % (now + days * 86400)
+            self.git("commit", "-qm", subject.replace("%d", str(n)),
+                     env={"GIT_AUTHOR_DATE": when, "GIT_COMMITTER_DATE": when})
             added.append(n)
         return add
 
@@ -2301,6 +2304,65 @@ class SessionTest(unittest.TestCase):
         lines = self.stale_lines("consolidate", "--since", start)
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("Widget (entries/2031-01-widget.md, changed)", lines[0])
+
+    # ---- and again while it stays there, once a week (#28) ----
+
+    def empty_commit(self, subject, days=0):
+        """A commit that changes no file, <days> after now: a run that adds no entry."""
+        when = "%d +0000" % (int(time.time()) + days * 86400)
+        self.git("commit", "-q", "--allow-empty", "-m", subject, env={"GIT_AUTHOR_DATE": when, "GIT_COMMITTER_DATE": when})
+
+    def test_stale_version_shows_again_on_the_first_run_of_a_later_week(self):
+        add = self.stale_log()
+        add()
+        add()   # an earlier run: 2 -> 3, its line shown then
+        start = "%s@0" % self.head()
+        add(days=8)   # this run, the next week: 3 -> 4
+        lines = self.stale_lines("consolidate", "--since", start)
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("Target version `backend` has 4 entries behind its last save", lines[0])
+        self.assertEqual(len(self.stale_lines("log")), 1)
+
+    def test_stale_version_shown_once_a_week(self):
+        add = self.stale_log()
+        add()
+        add()   # 2 -> 3: shown
+        add(days=1)   # 3 -> 4, the same week: not again
+        self.assertEqual(self.stale_lines("log"), [])
+        start = "%s@0" % self.head()
+        add(days=6)   # still the save's first week
+        self.assertEqual(self.stale_lines("consolidate", "--since", start), [])
+        add(days=8)   # the second week's first run
+        self.assertEqual(len(self.stale_lines("log")), 1)
+        add(days=13)   # the second week's next run
+        self.assertEqual(self.stale_lines("log"), [])
+        start = "%s@0" % self.head()
+        self.empty_commit("consolidate(widget): sections", days=15)   # the third week's first run, no new entry
+        self.assertEqual(len(self.stale_lines("consolidate", "--since", start)), 1)
+
+    def test_stale_version_crossed_in_another_mode_shows_at_the_next_run(self):
+        add = self.stale_log()
+        add()
+        add(subject="stories(part%d): a story")   # 2 -> 3 in stories, whose Next up has no stale line
+        add(subject="interview(acme): debrief")   # 3 -> 4
+        start = "%s@0" % self.head()
+        self.empty_commit("consolidate(widget): sections")
+        lines = self.stale_lines("consolidate", "--since", start)   # no run has shown it since it reached 3
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("has 4 entries behind its last save", lines[0])
+        add()   # a log run right after: the consolidate run showed it this week
+        self.assertEqual(self.stale_lines("log"), [])
+
+    def test_stale_line_names_three_entries_and_counts_the_rest(self):
+        add = self.stale_log()
+        for _ in range(4):
+            add()
+        start = "%s@0" % self.head()
+        add(days=8)
+        lines = self.stale_lines("consolidate", "--since", start)
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("has 6 entries behind its last save: Widget (entries/2031-01-widget.md, changed), Part 2"
+                      " (entries/2032-02-part2.md, new), Part 3 (entries/2032-03-part3.md, new) and 3 more.", lines[0])
 
     def test_stale_count_left_out_without_since_and_for_other_modes(self):
         add = self.stale_log()
