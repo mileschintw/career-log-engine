@@ -30,7 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e28 | pr | #28 | local_18b5216e-470a-4017-aafa-15f4848e9bfd（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e28-194730`，基於 d216eb1） | PR #57：template-checks fail（真的失敗）：`entries.py` 新 import 了 `check_save`，#56 的 guard `EveryImport` 抓到 38 個觸發清單缺口；source 本身也 fail。等使用者決定是否退回 e28 修 | — |
+| e28 | pr | #28 | local_18b5216e-470a-4017-aafa-15f4848e9bfd（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e28-194730`，基於 d216eb1） | working：使用者 picked「退回 e28 修」，已送修正請求（entries.py 不 import check_save）；push 後 PR #57 重跑 CI | — |
 
 **Main checkout:** none.
 
@@ -49,7 +49,6 @@ none
 
 ## Waiting for the user's decision
 
-- **PR #57 CI 失敗（since 2026-11-24 04:55 -0800）：** `tools/entries.py` 新增 `import check_save`，讓每個 import entries 的測試都連到 check_save 的整串 import，#56 的 guard 報 38 個缺口。建議退回 e28 修（不 import check_save，或把用到的函式移到不連帶整串的地方），修完再跑 CI。
 - **第四輪結束後：** Log 升到最新 Dev build 的 prompt（寫到私人記錄）；#28 的選項 4 等量過成本。
 
 ## Deadlines
