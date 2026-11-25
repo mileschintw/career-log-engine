@@ -144,6 +144,7 @@ if HERE not in sys.path:   # -I leaves this folder off sys.path
 sys.dont_write_bytecode = True
 import logfiles
 from entries import ENTRY_PATH, SCAN_REPORT, outputs   # what an entry's path is; the Log's outputs
+from entries import ARCHIVED, above_table, report_marks   # a report's Kind: and Archived lines
 from entries import PHRASING_PARTS, SIMILAR, phrasings, similar, words   # the Past phrasings parser
 import writing_lint   # the Visibility and AI-tell check 9 lines, run again at save
 import sponsorship   # where the sponsorship records are (RECORDS)
@@ -162,7 +163,6 @@ REPORT_NAME = re.compile(r"outputs/reports/(\d{4}-\d{2}-\d{2})-[^/\s]+\.md$")
 RANKING = re.compile(r"outputs/reports/\d{4}-\d{2}-\d{2}-([^/\s]+)-ranking\.md$")   # rank step 6's report
 EVENTS = "Events and contacts"
 CHECK_LINE = re.compile(r"(?:^|\s|: )check: ")
-ARCHIVED = re.compile(r"Archived \(user, (\d{4}-\d{2}-\d{2})\)")
 PHRASING_CAP = 2   # the wordings ## Past phrasings keeps per claim and angle (consolidate step 2)
 WRITE_SUBJECT = re.compile(r"write\((.+?)\): (\S.*?)(?: to (?:Reference|Archived))?")   # fullmatch
 KINDS = ("resume bullets", "cover letter", "bio", "elevator pitch", "application answer", "interview answer", "other")
@@ -297,23 +297,6 @@ PROVENANCE_FIX = ("replace each listed row with rows citing the entry sections b
 
 
 # ---- The output's files ----
-
-def above_table(text):
-    """The lines above a text's first table row."""
-    out = []
-    for line in text.lstrip("﻿").splitlines():
-        if line.strip().startswith("|"):
-            break
-        out.append(line)
-    return out
-
-
-def report_marks(text):
-    """(kind or None, whether it holds the Archived line) from the lines above a report's first table."""
-    lines = above_table(text)
-    kind = next((m.group(1).strip().lower() for m in (re.match(r"\s*Kind:\s*(\S.*?)\s*$", l) for l in lines) if m), None)
-    return kind, any(ARCHIVED.fullmatch(l.strip()) for l in lines)
-
 
 def write_subject(name, what):
     """The commit subject of a write save: `write(<company>): <role>`, `write(<target>): resume`,

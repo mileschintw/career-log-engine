@@ -1427,6 +1427,24 @@ def similar(a, b):
 # ---- Rulings against outputs ----
 
 SCAN_REPORT = re.compile(r"\d{4}-\d{2}-\d{2}-scan(?:-\d+)?\.md")
+ARCHIVED = re.compile(r"Archived \(user, (\d{4}-\d{2}-\d{2})\)")   # a report's Archived line (write › Save levels)
+
+
+def above_table(text):
+    """The lines above a text's first table row."""
+    out = []
+    for line in text.lstrip("﻿").splitlines():
+        if line.strip().startswith("|"):
+            break
+        out.append(line)
+    return out
+
+
+def report_marks(text):
+    """(kind or None, whether it holds the Archived line) from the lines above a report's first table."""
+    lines = above_table(text)
+    kind = next((m.group(1).strip().lower() for m in (re.match(r"\s*Kind:\s*(\S.*?)\s*$", l) for l in lines) if m), None)
+    return kind, any(ARCHIVED.fullmatch(l.strip()) for l in lines)
 
 
 def outputs(root):
@@ -1634,9 +1652,8 @@ def is_frozen(root, name):
     if name.startswith("outputs/applications/"):
         return True
     if name.startswith("outputs/reports/"):
-        import check_save   # it imports this module: imported here, not at the top
         try:
-            _, archived = check_save.report_marks(read(os.path.join(root, name)))
+            _, archived = report_marks(read(os.path.join(root, name)))
         except (OSError, UnicodeDecodeError):
             return False
         return archived
