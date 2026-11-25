@@ -122,3 +122,14 @@ PR #56 merged，關閉 #52；master push run 在 d216eb1e 通過（Dev build v0.
 - **第四輪（2026-11-24 04:20 -0800）：** 使用者 picked「1、2、3 都做」。#28 triage 成 ready-for-agent，issue 補了 Decision、Acceptance criteria、Files。
 
 - **PR #57 CI 失敗（since 2026-11-24 04:55 -0800）：** `tools/entries.py` 新增 `import check_save`，讓每個 import entries 的測試都連到 check_save 的整串 import，#56 的 guard 報 38 個缺口。建議退回 e28 修（不 import check_save，或把用到的函式移到不連帶整串的地方），修完再跑 CI。 → 使用者 picked「退回 e28 修」。
+
+## e28 merged（2026-11-25 09:35Z）
+
+PR #57 merged，關閉 #28（選項 1、2、3）；master push run 在 de37903b 通過（Dev build v0.4.2-dev.18）。第一次 CI 的 template-checks 失敗：`entries.py` 新 import `check_save`，#56 的 guard 抓到 38 個缺口；使用者 picked「退回 e28 修」，修正 1ce7ae6 把 report marker helpers 移進 entries.py，CI 全過。報告 `reports/e28.md`。Now 列：
+
+| e28 | pr | #28 | local_18b5216e-470a-4017-aafa-15f4848e9bfd（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e28-194730`，基於 d216eb1） | working：使用者 picked「退回 e28 修」，已送修正請求（entries.py 不 import check_save）；push 後 PR #57 重跑 CI | — |
+| #28 Output 對 entry 的檢查只在 audit 跑 | 1 | none | none | `tools/check.py`、`tools/entries.py`、`modes/consolidate.md`、`interview.md`、`stories.md`、`write.md` | 第四輪 lane e28（選項 1、2、3） |
+
+## 第四輪結束（2026-11-25 01:36 -0800）
+
+- **Merge right:** 2026-11-24 04:20 -0800，使用者 picked「1、2、3 都做」（問題：#28 要照建議先做選項 1 和 3 嗎？；問題前說明選好後照前三輪的做法開 lane、CI 過就 merge）：lane e28。

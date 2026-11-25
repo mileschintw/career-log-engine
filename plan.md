@@ -9,13 +9,13 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-24 04:20 -0800）：** 第四輪 lane e28（#28 選項 1、2、3）開工；PR CI 過就 merge。之後寫 Log 升級 prompt。
+- **Next（2026-11-25 01:36 -0800）：** 第四輪 e28 merge（#57），最新 Dev build v0.4.2-dev.18。沒有 lane、沒有鬧鐘。等使用者：archive e28 session 和刪分支、Log 升級 prompt、本機 guard 觸發缺口要不要開 issue。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** 2026-11-24 04:20 -0800，使用者 picked「1、2、3 都做」（問題：#28 要照建議先做選項 1 和 3 嗎？；問題前說明選好後照前三輪的做法開 lane、CI 過就 merge）：lane e28。
+- **Merge right:** none（第四輪的已結束，在 `plan-history.md`〈第四輪結束〉）
 - **Unattended log:** none
 
 ## Rulings
@@ -30,7 +30,6 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
-| e28 | pr | #28 | local_18b5216e-470a-4017-aafa-15f4848e9bfd（落在 `.claude/worktrees/lane-823-251cbd`，分支 `claude/lane-e28-194730`，基於 d216eb1） | working：使用者 picked「退回 e28 修」，已送修正請求（entries.py 不 import check_save）；push 後 PR #57 重跑 CI | — |
 
 **Main checkout:** none.
 
@@ -40,7 +39,6 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
-| #28 Output 對 entry 的檢查只在 audit 跑 | 1 | none | none | `tools/check.py`、`tools/entries.py`、`modes/consolidate.md`、`interview.md`、`stories.md`、`write.md` | 第四輪 lane e28（選項 1、2、3） |
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
 
 ## Waiting for the user to be present
@@ -49,7 +47,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第四輪結束後：** Log 升到最新 Dev build 的 prompt（寫到私人記錄）；#28 的選項 4 等量過成本。
+- **第四輪結束後（since 2026-11-25 01:36 -0800）：** archive e28 的 session 並刪遠端分支；Log 升到最新 Dev build（v0.4.2-dev.18）的 prompt（寫到私人記錄）；#28 的選項 4 等量過成本；本機 `checks_for.py` 改了某檔的 import 時不跑 `test_checks_for.py`（PR #57 的缺口只在 CI 抓到），要不要開 issue。
 
 ## Deadlines
 
