@@ -135,3 +135,5 @@ PR #57 merged，關閉 #28（選項 1、2、3）；master push run 在 de37903b 
 - **Merge right:** 2026-11-24 04:20 -0800，使用者 picked「1、2、3 都做」（問題：#28 要照建議先做選項 1 和 3 嗎？；問題前說明選好後照前三輪的做法開 lane、CI 過就 merge）：lane e28。
 
 2026-11-25 02:12 -0800 使用者說「都做」：e28 session 已 archive（worktree 乾淨、已在 master），遠端分支 `claude/lane-e28-194730` 已刪；Log 升到最新 Dev build 的 prompt 寫進私人記錄的 prompts/。
+
+2026-11-25 15:23 -0800 Log 升級（使用者自己開的 session）：0.4.2-dev.1 → 0.4.2-dev.18，plan 沒有 stop／removed／edited／overwritten 行；plan 後和 push 前都停下等 yes；Dev build 警告只說一次（plan 訊息）；升級指南回 nothing left to migrate；audit 和升級前相比沒有新行。coordinator 核對過 Log repo：版本、commit 已 push、升級暫存已清。

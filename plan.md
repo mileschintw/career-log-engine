@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-25 02:12 -0800）：** 四輪都結束，e28 session 已 archive、分支已刪；Log 升級 prompt 已寫進私人記錄。沒有 lane、沒有鬧鐘。等使用者跑 Log 升級並貼回報。
+- **Next（2026-11-25 15:23 -0800）：** 四輪結束；Log 已升到 0.4.2-dev.18 並確認。沒有 lane、沒有鬧鐘。等使用者決定下一步。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
@@ -47,7 +47,7 @@ none
 
 ## Waiting for the user's decision
 
-- **第四輪結束後（since 2026-11-25）：** 使用者在 Log 那邊跑升級 prompt（在私人記錄的 prompts/），回報貼回來；#28 的選項 4 等量過成本；本機 `checks_for.py` 改了某檔的 import 時不跑 `test_checks_for.py`，要不要開 issue。
+- **之後（since 2026-11-25 15:23 -0800）：** #28 的選項 4 等量過成本；本機 `checks_for.py` 改了某檔的 import 時不跑 `test_checks_for.py`，要不要開 issue；#30 Long-term。
 
 ## Deadlines
 
