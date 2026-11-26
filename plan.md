@@ -40,6 +40,7 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
+| #58 本機改了某檔的 import 時不跑 import guard（`EveryImport`） | — | none | none | `tools/checks_for.py › GROUPS`、`checks-for-tests.yml › paths:` | 不排 lane：needs-triage；使用者要求開的（PR #57 的缺口只在 CI 抓到） |
 
 ## Waiting for the user to be present
 
@@ -47,7 +48,7 @@ none
 
 ## Waiting for the user's decision
 
-- **之後（since 2026-11-25 15:23 -0800）：** #28 的選項 4 等量過成本；本機 `checks_for.py` 改了某檔的 import 時不跑 `test_checks_for.py`，要不要開 issue；#30 Long-term。
+- **之後（since 2026-11-25 15:23 -0800）：** #28 的選項 4 等量過成本；#58（本機 import guard 缺口，已開，等排輪）；#30 Long-term。
 
 ## Deadlines
 
