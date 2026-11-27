@@ -279,8 +279,8 @@ GROUPS = [
     ], [
         py("tools/tests/test_sync.py"),
     ]),
-    # its EveryImport (#52) reads the import graph of every .py a check reaches, so a change to any of
-    # them, a new one too, can add or remove an edge it checks (#58)
+    # tools/tests/test_checks_for.py's EveryImport (#52) reads the imports of every .py a check
+    # reaches, so a change to any of them, a new one too, can add or remove an edge it checks (#58)
     ("checks_for", "checks-for-tests.yml", [
         EXPORT, ".github/workflows/", "tools/*.py", "tools/tests/*.py", "maintainer/*.py", "maintainer/tests/*.py",
         "docs/upgrades/*.py",

@@ -2,8 +2,9 @@
 # include the parity test: every workflow here runs on the same paths: and steps as its groups in the
 # tool's map, so the job runs when any workflow changes, and when tools/export-template.sh does (the
 # tool reads its ALLOW list). They include EveryImport too (#52), which reads the imports of every
-# .py a check reaches, so the job also runs on a change to any .py under tools/, maintainer/ and
-# docs/upgrades/, tests included, where a change can add or remove an import edge (#58).
+# .py a check reaches, so the job also runs on a change to a .py in tools/, tools/tests/,
+# maintainer/, maintainer/tests/ or docs/upgrades/, where a change can add or remove an import edge
+# (#58); EveryImport's test_the_guard_runs_on_every_module_it_reads fails when it reads one elsewhere.
 # Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11): it matches path
 # strings, and its one Windows case (a path on another drive) is left to the session that changes it,
 # which runs these tests on its own platform too (SETUP.md step 7).
