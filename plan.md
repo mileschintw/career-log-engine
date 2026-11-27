@@ -30,6 +30,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 
 | Key | Kind | Issues | Session | State | Parked until |
 |---|---|---|---|---|---|
+| e58 | pr | #58 | local_74820ac2-90e9-4915-baca-bbac4768c7ec（使用者從卡片開，分支 `claude/wonderful-neumann-98dc7a`） | PR open, waitchecks | — |
 
 **Main checkout:** none.
 
