@@ -139,3 +139,14 @@ PR #57 merged，關閉 #28（選項 1、2、3）；master push run 在 de37903b 
 2026-11-25 15:23 -0800 Log 升級（使用者自己開的 session）：0.4.2-dev.1 → 0.4.2-dev.18，plan 沒有 stop／removed／edited／overwritten 行；plan 後和 push 前都停下等 yes；Dev build 警告只說一次（plan 訊息）；升級指南回 nothing left to migrate；audit 和升級前相比沒有新行。coordinator 核對過 Log repo：版本、commit 已 push、升級暫存已清。
 
 - **第五輪（2026-11-26 16:44 -0800）：** 使用者 picked「開工，CI 過就 merge」。#58 triage 成 ready-for-agent。
+
+## e58 merged（2026-11-27 01:11Z）
+
+PR #59 merged，關閉 #58；master push run 在 983ece73 通過（Dev build v0.4.2-dev.19）。import guard 在 tools/、maintainer/、docs/upgrades/ 的任何 .py 改動時都跑；test_checks_for.py 從 122 s 降到 9 s。報告 `reports/e58.md`。Now 列：
+
+| e58 | pr | #58 | local_74820ac2-90e9-4915-baca-bbac4768c7ec（使用者從卡片開，分支 `claude/wonderful-neumann-98dc7a`） | PR open, waitchecks | — |
+| #58 本機改了某檔的 import 時不跑 import guard（`EveryImport`） | 1 | none | none | `tools/checks_for.py › GROUPS`、`checks-for-tests.yml › paths:` | 第五輪 lane e58 |
+
+## 第五輪結束（2026-11-26 17:12 -0800）
+
+- **Merge right:** 2026-11-26 16:44 -0800，使用者 picked「開工，CI 過就 merge」（問題：要現在開一輪做 #58 嗎？）：lane e58。
