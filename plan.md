@@ -9,7 +9,7 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-26 17:12 -0800）：** 第五輪 e58 merge（#59），最新 Dev build v0.4.2-dev.19。沒有 lane、沒有鬧鐘。等使用者：archive e58 session 和刪分支；Log 要不要再升級。
+- **Next（2026-11-26 17:19 -0800）：** 五輪都結束，session 都已 archive、lane 分支都已刪。沒有 lane、沒有鬧鐘。Engine 只剩 #30（Long-term）；#28 選項 4 等量過成本；Log 在 0.4.2-dev.18，等下次有實質改動再升。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
