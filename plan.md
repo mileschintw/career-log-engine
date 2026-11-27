@@ -9,13 +9,13 @@ Last updated: 2026-11-23 03:48 -0800（新 coordinator 接手）
 ## Handover
 
 - **Coordinator:** title engine-coordinator-b9a6ad, worktree D:\Repos\career-log-engine\.claude\worktrees\engine-coordinator-b9a6ad, id local_9ffe4687-9b12-418a-998f-24bd9642ab18, mode normal. 2026-11-23 03:48 -0800 接手；由上一個 coordinator（local_651b2b18-d78c-4525-946a-c80da1bfbfd6，在私人記錄上做到 #818 的拆分完成）開的 session。
-- **Next（2026-11-25 15:23 -0800）：** 四輪結束；Log 已升到 0.4.2-dev.18 並確認。沒有 lane、沒有鬧鐘。等使用者決定下一步。
+- **Next（2026-11-26 16:44 -0800）：** 第五輪 lane e58（#58）開工；PR CI 過就 merge。
 - **Standing instructions:**
   - 2026-11-13 16:00：「重新開一次，每個新開的 worker session 都用 model opus、effort high」。之後開的 worker 都用 `model: claude-opus-5-5`、`effort: high`。
   - 2026-10-26：進行中的工作做完後，不要開始新任務；下一步只列出來，等使用者說開工。
   - 2026-10-29：「第一波請一次提出整個 frontier 和後面的依賴鏈，等我同意後再開 session。」
   - Log 的資料工作從不排 lane（`project.md` › Log data work）。
-- **Merge right:** none（第四輪的已結束，在 `plan-history.md`〈第四輪結束〉）
+- **Merge right:** 2026-11-26 16:44 -0800，使用者 picked「開工，CI 過就 merge」（問題：要現在開一輪做 #58 嗎？）：lane e58。
 - **Unattended log:** none
 
 ## Rulings
@@ -40,7 +40,7 @@ Every open issue, once. "Order" is the wave (1 = can start now). "Kind" is `free
 | Issue | Order | Blocked by (GitHub) | Same-section wait | Files it owns | Kind |
 |---|---|---|---|---|---|
 | #30 Subagents：Screen 用便宜的模型 | — | none | none | 缺 Files 節 | 不排 lane：Long-term |
-| #58 本機改了某檔的 import 時不跑 import guard（`EveryImport`） | — | none | none | `tools/checks_for.py › GROUPS`、`checks-for-tests.yml › paths:` | 不排 lane：needs-triage；使用者要求開的（PR #57 的缺口只在 CI 抓到） |
+| #58 本機改了某檔的 import 時不跑 import guard（`EveryImport`） | 1 | none | none | `tools/checks_for.py › GROUPS`、`checks-for-tests.yml › paths:` | 第五輪 lane e58 |
 
 ## Waiting for the user to be present
 
@@ -48,7 +48,7 @@ none
 
 ## Waiting for the user's decision
 
-- **之後（since 2026-11-25 15:23 -0800）：** #28 的選項 4 等量過成本；#58（本機 import guard 缺口，已開，等排輪）；#30 Long-term。
+- **之後（since 2026-11-25 15:23 -0800）：** #28 的選項 4 等量過成本；#30 Long-term。
 
 ## Deadlines
 
