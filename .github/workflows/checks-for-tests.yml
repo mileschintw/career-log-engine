@@ -1,7 +1,9 @@
 # Runs the tests of tools/checks_for.py (which checks to run for the paths a change touched). They
 # include the parity test: every workflow here runs on the same paths: and steps as its groups in the
 # tool's map, so the job runs when any workflow changes, and when tools/export-template.sh does (the
-# tool reads its ALLOW list).
+# tool reads its ALLOW list). They include EveryImport too (#52), which reads the imports of every
+# .py a check reaches, so the job also runs on a change to any .py under tools/, maintainer/ and
+# docs/upgrades/, tests included, where a change can add or remove an import edge (#58).
 # Linux only (standing in for macOS), on the oldest Python SETUP.md supports (3.11): it matches path
 # strings, and its one Windows case (a path on another drive) is left to the session that changes it,
 # which runs these tests on its own platform too (SETUP.md step 7).
@@ -11,11 +13,13 @@ name: Checks-for tests
 on:
   pull_request:
     paths:
-      - "tools/checks_for.py"
-      - "tools/tests/test_checks_for.py"
       - "tools/export-template.sh"
       - ".github/workflows/**"
-      - "tools/logfiles.py"
+      - "tools/*.py"
+      - "tools/tests/*.py"
+      - "maintainer/*.py"
+      - "maintainer/tests/*.py"
+      - "docs/upgrades/*.py"
       - ".github/workflows/checks-for-tests.yml"
 
 permissions:

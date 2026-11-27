@@ -250,17 +250,55 @@ def reads(rel, root=REPO):
     path = os.path.join(root, rel)
     with open(path, encoding="utf-8") as f:
         source = f.read()
+    if (path, source) not in PARSED:
+        PARSED[(path, source)] = parse(rel, path, source)
+    names, loads = PARSED[(path, source)]
+    names, paths, untold = set(names), set(), []
+    for into, got, arg in loads:
+        if into == "paths":
+            got = [under_root(g, root) for g in got]
+            paths.update(g for g in got if g is not None)
+        else:
+            names.update(g for g in got if g is not None)
+        if None in got:
+            untold.append((rel, arg))
+    out = set()
+    for p in paths:
+        p = os.path.relpath(os.path.normpath(os.path.join(os.path.dirname(path), p)), root).replace("\\", "/")
+        if p.endswith(".py") and not p.startswith("../") and os.path.isfile(os.path.join(root, p)):
+            out.add(p)
+    for n in names:
+        for folder in (os.path.dirname(rel), "tools"):
+            p = (folder + "/" if folder else "") + n.split(".")[0] + ".py"
+            if os.path.isfile(os.path.join(root, p)):
+                out.add(p)
+                break
+    out.discard(rel)
+    return out, untold
+
+
+# (path, source): parse()'s answer. imported() reads the modules most checks share once per check,
+# and EveryImport runs it for every check several times: parsing each file once keeps the guard
+# cheap enough to run on every change to a module it reads (#58)
+PARSED = {}
+
+
+def parse(rel, path, source):
+    """reads()'s part that needs only the file's text: (the module names its import statements
+    name, each load by path or name as (paths or names, the values value() tells of its argument,
+    one per call, None where it cannot tell, the argument's source))."""
     tree = ast.parse(source, rel)
     shared = {n for node in ast.walk(tree) if isinstance(node, ast.Global) for n in node.names}
-    env = {k: v for k, v in constants(own(tree), {}, path).items() if k not in shared}   # HERE, TOOL and the like
     functions = [n for n in ast.walk(tree) if isinstance(n, FUNCTIONS)]
+    owns = {id(scope): own(scope) for scope in [tree] + functions}
+    env = {k: v for k, v in constants(owns[id(tree)], {}, path).items() if k not in shared}   # HERE, TOOL and the like
     base = {id(tree): env}   # each scope's constants, its parameters hiding the file's
     for f in functions:
-        base[id(f)] = constants(own(f), {k: v for k, v in env.items() if k not in parameters(f)}, path)
+        base[id(f)] = constants(owns[id(f)], {k: v for k, v in env.items() if k not in parameters(f)}, path)
     named = {f.name for f in functions if not isinstance(f, ast.Lambda)}
     calls = {}   # a function's name: the positional arguments value() tells of each call to it
     for scope in [tree] + functions:
-        nodes = own(scope)
+        nodes = owns[id(scope)]
         called = {id(n.func) for n in nodes if isinstance(n, ast.Call)}
         for node in nodes:
             target = node.func if isinstance(node, ast.Call) else node
@@ -276,15 +314,15 @@ def reads(rel, root=REPO):
                 calls.setdefault(name, []).append(first + [value(a, base[id(scope)], path) for a in node.args])
             elif id(node) not in called and isinstance(node.ctx, ast.Load):   # passed on, called elsewhere
                 calls.setdefault(name, []).append([])
-    paths, names, untold = set(), set(), []
+    names, loads = set(), []
     for scope in [tree] + functions:
         envs = [base[id(scope)]]
         if scope is not tree and getattr(scope, "name", None) in calls:   # each call's arguments
             positional = [p.arg for p in scope.args.posonlyargs + scope.args.args]
             outer = {k: v for k, v in env.items() if k not in parameters(scope)}
-            envs = [constants(own(scope), dict(outer, **{p: a for p, a in zip(positional, args) if a is not None}), path)
+            envs = [constants(owns[id(scope)], dict(outer, **{p: a for p, a in zip(positional, args) if a is not None}), path)
                     for args in calls[scope.name]]
-        for node in own(scope):
+        for node in owns[id(scope)]:
             if isinstance(node, ast.Import):
                 names.update(a.name.split(".")[0] for a in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -292,30 +330,13 @@ def reads(rel, root=REPO):
             elif isinstance(node, ast.Call) and node.args:
                 fn = dotted(node.func) or ""
                 if fn.endswith("spec_from_file_location") and len(node.args) > 1:
-                    arg, into = node.args[1], paths
+                    arg, into = node.args[1], "paths"
                 elif fn == "__import__" or fn.endswith("import_module"):
-                    arg, into = node.args[0], names
+                    arg, into = node.args[0], "names"
                 else:
                     continue
-                got = [value(arg, e, path) for e in envs]
-                if into is paths:
-                    got = [under_root(g, root) for g in got]
-                into.update(g for g in got if g is not None)
-                if None in got:
-                    untold.append((rel, ast.get_source_segment(source, arg)))
-    out = set()
-    for p in paths:
-        p = os.path.relpath(os.path.normpath(os.path.join(os.path.dirname(path), p)), root).replace("\\", "/")
-        if p.endswith(".py") and not p.startswith("../") and os.path.isfile(os.path.join(root, p)):
-            out.add(p)
-    for n in names:
-        for folder in (os.path.dirname(rel), "tools"):
-            p = (folder + "/" if folder else "") + n.split(".")[0] + ".py"
-            if os.path.isfile(os.path.join(root, p)):
-                out.add(p)
-                break
-    out.discard(rel)
-    return out, untold
+                loads.append((into, [value(arg, e, path) for e in envs], ast.get_source_segment(source, arg)))
+    return names, loads
 
 
 # (file, argument): a load by path or name whose argument the guard cannot tell (reads()), and the
@@ -413,7 +434,7 @@ class Typical(unittest.TestCase):
                          ["tools/export-template.sh", "tools/tests/test_check_run.py", "tools/tests/test_check_save.py",
                           "tools/tests/test_check.py", "tools/tests/test_scan.py", "tools/tests/test_fit.py",
                           "tools/tests/test_dashboard.py", "tools/tests/test_application.py",
-                          "tools/tests/test_logfiles.py"])
+                          "tools/tests/test_checks_for.py", "tools/tests/test_logfiles.py"])
 
     def test_entries(self):
         # tools/logfiles.py is imported by every tool tools/entries.py is, and by tools/sync.py and
@@ -429,7 +450,8 @@ class Typical(unittest.TestCase):
             "tools/tests/test_fit.py", "tools/tests/test_dashboard.py",
             "tools/tests/test_upgrade.py"]   # through docs/upgrades/upgrade-0.4.0.py
             + (["maintainer/tests/test_prepush.py"] if SOURCE else []) + [
-            "tools/tests/test_writing_lint.py", "tools/tests/test_application.py"])
+            "tools/tests/test_writing_lint.py", "tools/tests/test_application.py",
+            "tools/tests/test_checks_for.py"])   # every .py the import guard reads (#58)
         self.assertEqual(scripts(runs(["tools/logfiles.py"])), both + [
             "tools/tests/test_config.py", "tools/tests/test_check.py", "tools/tests/test_speech.py",   # speech.py imports logfiles (#773)
             "tools/tests/test_resume.py", "tools/tests/test_guide.py", "tools/tests/test_skill_lint.py", "tools/skill_lint.py", "tools/tests/test_scan.py",
@@ -466,7 +488,8 @@ class Typical(unittest.TestCase):
     def test_chat_export_and_check_run_apart(self):
         # check_run.py imports chat_export.py; chat_export.py imports neither of them
         self.assertEqual(scripts(runs(["tools/check_run.py"]))[1:],
-                         ["tools/tests/test_check_run.py", "tools/tests/test_check_save.py", "tools/tests/test_logfiles.py"])
+                         ["tools/tests/test_check_run.py", "tools/tests/test_check_save.py", "tools/tests/test_checks_for.py",
+                          "tools/tests/test_logfiles.py"])
         self.assertEqual(scripts(runs(["tools/tests/fixtures/x.json"])),
                          ["tools/export-template.sh", "tools/tests/test_chat_export.py", "tools/tests/test_logfiles.py"])
         self.assertEqual(scripts(runs(["tools/chat_export.py"]))[:4],
@@ -860,6 +883,43 @@ class EveryImport(unittest.TestCase):
         flows["coord-tests.yml"] = flows["coord-tests.yml"].replace('      - "tools/logfiles.py"\n', "")
         self.assertIn("maintainer/tests/test_prepush.py imports tools/logfiles.py: the paths: of coord-tests.yml lack it",
                       import_gaps(checks_for.GROUPS, REPO, flows))
+
+    def test_the_guard_runs_on_every_module_it_reads(self):
+        # #58: a change to any module the guard reads can add or remove an import edge, so it runs
+        # the group that runs the guard, as does a new module beside them
+        guard = [g for g in checks_for.GROUPS if any(c[1] == "tools/tests/test_checks_for.py" for c in g[3])]
+        triggers = [t for g in guard for t in checks_for.triggers(g, REPO)]
+        flows = read_workflows()
+        paths = [p[:-2] if p.endswith("/**") else p
+                 for g in guard if g[1] in flows for p in workflow_paths(flows[g[1]])[0] or []]
+        read = set()
+        for g in checks_for.GROUPS:
+            for c in g[3]:
+                if c[0] == "py" and checks_for.present(c, REPO):
+                    read |= {m for m in imported(c[1]) if not m.endswith("/")}
+        read |= {"tools/new_tool.py", "tools/tests/test_new.py"} | ({"maintainer/new_tool.py",
+                 "maintainer/tests/test_new.py"} if SOURCE else set())
+        self.assertEqual(sorted(m for m in read if not any(checks_for.matches(m, t) for t in triggers)), [])
+        if flows:
+            self.assertEqual(sorted(m for m in read if not any(checks_for.matches(m, p) for p in paths)), [])
+
+    def test_a_planted_edge_fails_the_check_its_path_runs(self):
+        # #58: a test that imports a tool its group leaves out fails the guard, which a change to
+        # that test runs
+        scratch = tempfile.mkdtemp()
+        try:
+            for rel in ("tools/tests/test_x.py", "tools/x.py", "tools/y.py"):
+                os.makedirs(os.path.dirname(os.path.join(scratch, rel)), exist_ok=True)
+            with open(os.path.join(scratch, "tools/tests/test_x.py"), "w") as f:
+                f.write("import x\nimport y\n")
+            for rel in ("tools/x.py", "tools/y.py"):
+                open(os.path.join(scratch, rel), "w").close()
+            groups = [("x", None, ["tools/x.py", "tools/tests/test_x.py"], [checks_for.py("tools/tests/test_x.py")])]
+            self.assertEqual(import_gaps(groups, scratch), ["tools/tests/test_x.py imports tools/y.py: no group that "
+                                                            "runs it (x) has it in tools/checks_for.py GROUPS"])
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
+        self.assertIn("tools/tests/test_checks_for.py", scripts(runs(["tools/tests/test_entries.py"])))
 
     def test_a_group_that_runs_it_is_enough(self):
         # test_check.py runs in three groups (config, machine check, speech): the config group alone

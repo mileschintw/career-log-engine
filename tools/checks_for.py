@@ -37,7 +37,8 @@ this repo's .github/workflows/ runs, on the same `paths:`, the workflow's own fi
 that share a workflow are run together by it, on all their `paths:`. tools/tests/test_checks_for.py
 fails when a workflow and its groups disagree, and when a repo module a check imports (directly or
 through other repo modules, by an import or loaded by path) is in no trigger of the groups that run
-it or no `paths:` of their workflows (#52). A new tool or test: add its group here, and in the
+it or no `paths:` of their workflows (#52); its group, checks_for, runs on a change to any .py the
+guard reads (#58). A new tool or test: add its group here, and in the
 Template's source a workflow for it with the same `paths:` plus its own file, or name a workflow
 whose `paths:` it mostly shares and add its paths and steps there. A check whose script is missing (maintainer/
 in a Template) is left out, and so is a do: step that names a missing file (docs/upgrades/test-next.sh
@@ -278,8 +279,11 @@ GROUPS = [
     ], [
         py("tools/tests/test_sync.py"),
     ]),
+    # its EveryImport (#52) reads the import graph of every .py a check reaches, so a change to any of
+    # them, a new one too, can add or remove an edge it checks (#58)
     ("checks_for", "checks-for-tests.yml", [
-        "tools/checks_for.py", "tools/tests/test_checks_for.py", EXPORT, ".github/workflows/", "tools/logfiles.py",
+        EXPORT, ".github/workflows/", "tools/*.py", "tools/tests/*.py", "maintainer/*.py", "maintainer/tests/*.py",
+        "docs/upgrades/*.py",
     ], [
         py("tools/tests/test_checks_for.py"),
     ]),
